@@ -4,12 +4,21 @@
 #ifndef OutputDir
   #error OutputDir must be supplied by the build script.
 #endif
+#ifndef ReleaseVersion
+  #define ReleaseVersion "0.3.0-beta.1"
+#endif
+#ifndef DisplayVersion
+  #define DisplayVersion "0.3.0 Beta 1"
+#endif
+#ifndef NumericVersion
+  #define NumericVersion "0.3.0.1"
+#endif
 
 [Setup]
 AppId={{13D98B93-0E26-42F1-A4CA-7DCE509BB689}
 AppName=Cineleaf
-AppVersion=0.3.0.1
-AppVerName=Cineleaf 0.3.0 Beta 1
+AppVersion={#NumericVersion}
+AppVerName=Cineleaf {#DisplayVersion}
 AppPublisher=Cineleaf contributors
 AppPublisherURL=https://github.com/luucabg/cineleaf
 AppSupportURL=https://github.com/luucabg/cineleaf/issues
@@ -20,7 +29,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=Cineleaf-0.3.0-beta.1-Windows-x64-Setup
+OutputBaseFilename=Cineleaf-{#ReleaseVersion}-Windows-x64-Setup
 SetupIconFile=..\src\Cineleaf.Windows.App\Assets\Cineleaf.ico
 UninstallDisplayIcon={app}\Cineleaf.exe
 Compression=lzma2/ultra64

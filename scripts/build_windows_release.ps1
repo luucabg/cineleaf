@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$')]
+    [string]$ReleaseVersion = "0.3.0-beta.1",
     [switch]$SkipTests
 )
 
@@ -41,7 +43,7 @@ Copy-Item -LiteralPath (Join-Path $toolsDirectory "FFmpeg-LICENSE.txt") -Destina
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination (Join-Path $publishDirectory "LICENSE.txt") -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "THIRD_PARTY_NOTICES.md") -Destination $publishDirectory -Force
 
-$portable = Join-Path $distributionDirectory "Cineleaf-0.3.0-beta.1-Windows-x64-Portable.zip"
+$portable = Join-Path $distributionDirectory "Cineleaf-$ReleaseVersion-Windows-x64-Portable.zip"
 if (Test-Path -LiteralPath $portable) { Remove-Item -LiteralPath $portable -Force }
 Compress-Archive -Path (Join-Path $publishDirectory "*") -DestinationPath $portable -CompressionLevel Optimal
 
@@ -52,12 +54,16 @@ $isccCandidates = @(
 )
 $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 if ($null -eq $iscc) { throw "Inno Setup 6 is required to create the installer. Install it, then rerun this script." }
-& $iscc "/DSourceDir=$publishDirectory" "/DOutputDir=$distributionDirectory" (Join-Path $repositoryRoot "Windows\installer\Cineleaf.iss")
+$baseVersion = ($ReleaseVersion -split '-', 2)[0]
+$buildNumber = if ($ReleaseVersion -match '-(?:beta|rc)\.(\d+)$') { $Matches[1] } else { "0" }
+$numericVersion = "$baseVersion.$buildNumber"
+$displayVersion = $ReleaseVersion -replace '-beta\.', ' Beta ' -replace '-rc\.', ' RC ' -replace '-', ' '
+& $iscc "/DSourceDir=$publishDirectory" "/DOutputDir=$distributionDirectory" "/DReleaseVersion=$ReleaseVersion" "/DDisplayVersion=$displayVersion" "/DNumericVersion=$numericVersion" (Join-Path $repositoryRoot "Windows\installer\Cineleaf.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
 
-$checksumName = "Cineleaf-0.3.0-beta.1-Windows-SHA256SUMS.txt"
+$checksumName = "Cineleaf-$ReleaseVersion-Windows-SHA256SUMS.txt"
 $checksumPath = Join-Path $distributionDirectory $checksumName
-$artifacts = Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.3.0-beta.1-Windows-*" -and $_.Name -ne $checksumName }
+$artifacts = Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-$ReleaseVersion-Windows-*" -and $_.Name -ne $checksumName }
 $lines = $artifacts | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
 [IO.File]::WriteAllLines($checksumPath, $lines, [Text.UTF8Encoding]::new($false))
-Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.3.0-beta.1-Windows-*" } | Select-Object FullName,Length
+Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-$ReleaseVersion-Windows-*" } | Select-Object FullName,Length

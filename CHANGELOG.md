@@ -4,6 +4,15 @@ All notable changes are recorded here. Cineleaf follows semantic versioning afte
 
 ## Unreleased
 
+## 0.3.0-beta.2 — 2026-07-27
+
+### Distribution and documentation
+
+- Added one reproducible GitHub Release workflow that builds, verifies and attaches both Windows and universal Mac packages.
+- Added direct, plain-language Windows and Mac download instructions to the English base README.
+- Versioned Mac DMG, ZIP and checksum names now match their GitHub release tag; the DMG volume also shows the correct release version.
+- Kept the private `instructions.md` build brief ignored and guarded by both CI systems.
+
 ## 0.3.0-beta.1 — 2026-07-27
 
 ### Added

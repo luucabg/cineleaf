@@ -1,0 +1,125 @@
+name: Publish release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag
+        required: true
+        default: v0.3.0-beta.2
+        type: string
+      platform:
+        description: Packages to build and attach
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - macos
+          - windows
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cineleaf-release-${{ inputs.tag }}-${{ inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - name: Validate tag and existing release
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          gh release view "$RELEASE_TAG" >/dev/null
+          VERSION="${RELEASE_TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  macos-package:
+    if: inputs.platform == 'all' || inputs.platform == 'macos'
+    needs: validate-release
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Check out the released source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build and verify universal Mac package
+        env:
+          CINELEAF_RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          ./scripts/build_release.sh
+          PREFIX="Cineleaf-$CINELEAF_RELEASE_VERSION-macOS"
+          (cd dist && shasum -a 256 --check "$PREFIX-SHA256SUMS.txt")
+          hdiutil verify "dist/$PREFIX.dmg"
+          ARCHITECTURES="$(lipo -archs dist/Cineleaf.app/Contents/MacOS/Cineleaf)"
+          [[ "$ARCHITECTURES" == *arm64* && "$ARCHITECTURES" == *x86_64* ]]
+      - name: Attach Mac downloads to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          MAC_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          PREFIX="Cineleaf-$MAC_VERSION-macOS"
+          gh release upload "$RELEASE_TAG" \
+            "dist/$PREFIX.dmg" \
+            "dist/$PREFIX.zip" \
+            "dist/$PREFIX-SHA256SUMS.txt" \
+            --clobber
+
+  windows-package:
+    if: inputs.platform == 'all' || inputs.platform == 'windows'
+    needs: validate-release
+    runs-on: windows-2025
+    timeout-minutes: 50
+    steps:
+      - name: Check out the released source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Install installer compiler
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build and verify Windows packages
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: ./scripts/build_windows_release.ps1 -ReleaseVersion $env:RELEASE_VERSION
+      - name: Attach Windows downloads to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          $assets = Get-ChildItem -LiteralPath dist -File | Where-Object { $_.Name -like "Cineleaf-$env:RELEASE_VERSION-Windows-*" }
+          if ($assets.Count -ne 3) {
+            throw "Expected three Windows release files, found $($assets.Count)."
+          }
+          $arguments = @("release", "upload", $env:RELEASE_TAG) + @($assets.FullName) + "--clobber"
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "Uploading Windows release files failed."
+          }

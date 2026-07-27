@@ -1,6 +1,6 @@
 # Project status
 
-## Windows — `0.3.0-beta.1` candidate
+## Windows — `0.3.0-beta.2`
 
 The native Windows editor and downloadable self-contained installer are prepared for Windows 10/11 x64. The package includes .NET and FFmpeg, installs without administrator privileges, and does not require a separate runtime.
 
@@ -19,7 +19,7 @@ GitHub Actions run [30248743334](https://github.com/luucabg/cineleaf/actions/run
 
 The Windows workstation became locked during final visual inspection. Accessibility inspection confirmed the complete Spanish editor and a prior launch crash was diagnosed and fixed, but a final pixel-by-pixel screenshot review is still pending. The installer is unsigned, so SmartScreen can warn. No blocking defects are currently known after the automated and smoke checks.
 
-## Mac — `0.3.0-beta.1` source candidate
+## Mac — `0.3.0-beta.2`
 
 GitHub Actions run [30248743464](https://github.com/luucabg/cineleaf/actions/runs/30248743464) passed with Xcode 16.4 and Apple Swift 6.1.2:
 
@@ -27,7 +27,7 @@ GitHub Actions run [30248743464](https://github.com/luucabg/cineleaf/actions/run
 - Real synthetic media covered import, derivatives, analysis, effects, composition, cancellation, verified M4A/PNG extraction and verified MP4 export.
 - Packaging produced a universal `arm64`/`x86_64` app, ZIP, DMG and checksums.
 
-The utility pass includes project settings, black pauses, safe duplication, detached audio, verified M4A extraction and verified PNG frame capture. The updated AVFoundation source, CLI and universal packages all passed the macOS gate.
+The utility pass includes project settings, black pauses, safe duplication, detached audio, verified M4A extraction and verified PNG frame capture. The updated AVFoundation source, CLI and universal packages all passed the macOS gate. The public beta provides an ad-hoc-signed universal DMG and ZIP with SHA-256 checksums; it is not Apple-notarized.
 
 Mac still needs a complete hands-on review on physical hardware before a signed public Mac download: playback feel, microphone permissions, Gatekeeper flow, long-session memory/energy profiling and final screenshots.
 

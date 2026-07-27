@@ -4,6 +4,13 @@ set -euo pipefail
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$REPOSITORY_ROOT/dist"
 DERIVED_DATA="$REPOSITORY_ROOT/build/ReleaseDerivedData"
+RELEASE_VERSION="${CINELEAF_RELEASE_VERSION:-0.3.0}"
+
+if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Invalid release version: $RELEASE_VERSION" >&2
+  exit 1
+fi
+MAC_BASENAME="Cineleaf-$RELEASE_VERSION-macOS"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "Release builds require macOS with Xcode." >&2
@@ -62,12 +69,15 @@ ditto "$REPOSITORY_ROOT/Automation/mcp/src" "$AUTOMATION_RESOURCES/mcp/src"
 ditto "$REPOSITORY_ROOT/scripts/setup_cineleaf_mcp.sh" "$AUTOMATION_RESOURCES/setup_cineleaf_mcp.sh"
 codesign --force --deep --sign - "$DIST_DIR/Cineleaf.app"
 codesign --verify --deep --strict "$DIST_DIR/Cineleaf.app"
-ditto -c -k --sequesterRsrc --keepParent "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.3.0-macOS.zip"
-"$REPOSITORY_ROOT/scripts/create_dmg.sh" "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.3.0-macOS.dmg"
+ditto -c -k --sequesterRsrc --keepParent "$DIST_DIR/Cineleaf.app" "$DIST_DIR/$MAC_BASENAME.zip"
+"$REPOSITORY_ROOT/scripts/create_dmg.sh" \
+  "$DIST_DIR/Cineleaf.app" \
+  "$DIST_DIR/$MAC_BASENAME.dmg" \
+  "Cineleaf $RELEASE_VERSION"
 
 (
   cd "$DIST_DIR"
-  shasum -a 256 Cineleaf-0.3.0-macOS.zip Cineleaf-0.3.0-macOS.dmg > SHA256SUMS.txt
+  shasum -a 256 "$MAC_BASENAME.zip" "$MAC_BASENAME.dmg" > "$MAC_BASENAME-SHA256SUMS.txt"
 )
 
 echo "Created ad-hoc signed, non-notarized artifacts in $DIST_DIR"
