@@ -25,6 +25,7 @@ targets:
       - path: Cineleaf/Services/BoundedCache.swift
       - path: Cineleaf/Services/CineleafVideoCompositor.swift
       - path: Cineleaf/Services/CompositionBuilder.swift
+      - path: Cineleaf/Services/CoreMediaBridge.swift
       - path: Cineleaf/Services/ExportService.swift
       - path: Cineleaf/Services/LocalDiagnostics.swift
       - path: Cineleaf/Services/MediaAccessManager.swift
