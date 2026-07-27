@@ -65,7 +65,7 @@ jobs:
         with:
           name: cineleaf-windows-x64
           path: |
-            dist/Cineleaf-0.2.0-beta.1-Windows-x64-Setup.exe
-            dist/Cineleaf-0.2.0-beta.1-Windows-x64-Portable.zip
-            dist/Cineleaf-0.2.0-beta.1-Windows-SHA256SUMS.txt
+            dist/Cineleaf-0.3.0-beta.1-Windows-x64-Setup.exe
+            dist/Cineleaf-0.3.0-beta.1-Windows-x64-Portable.zip
+            dist/Cineleaf-0.3.0-beta.1-Windows-SHA256SUMS.txt
           if-no-files-found: error

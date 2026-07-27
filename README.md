@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luucabg/cineleaf/releases/tag/v0.2.0-beta.1"><img alt="Última versión" src="https://img.shields.io/github/v/release/luucabg/cineleaf?include_prereleases&color=327C60"></a>
+  <a href="https://github.com/luucabg/cineleaf/releases/tag/v0.3.0-beta.1"><img alt="Última versión" src="https://img.shields.io/github/v/release/luucabg/cineleaf?include_prereleases&color=327C60"></a>
   <a href="https://github.com/luucabg/cineleaf/actions/workflows/windows-ci.yml"><img alt="Pruebas de Windows" src="https://github.com/luucabg/cineleaf/actions/workflows/windows-ci.yml/badge.svg"></a>
   <a href="https://github.com/luucabg/cineleaf/actions/workflows/ci.yml"><img alt="Pruebas de Mac" src="https://github.com/luucabg/cineleaf/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/license-MIT-327C60.svg"></a>
@@ -16,13 +16,13 @@
 
 ## Descargar Cineleaf para Windows
 
-La forma más sencilla es descargar **[Cineleaf para Windows (instalador EXE)](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-x64-Setup.exe)**.
+La forma más sencilla es descargar **[Cineleaf para Windows (instalador EXE)](https://github.com/luucabg/cineleaf/releases/download/v0.3.0-beta.1/Cineleaf-0.3.0-beta.1-Windows-x64-Setup.exe)**.
 
 1. Descarga el archivo.
 2. Ábrelo y sigue el instalador. No necesita permisos de administrador.
 3. Abre Cineleaf desde el menú Inicio.
 
-También existe una **[versión portátil ZIP](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-x64-Portable.zip)** que no se instala. Los usuarios avanzados pueden comprobar la descarga con el archivo de **[sumas SHA-256](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-SHA256SUMS.txt)**.
+También existe una **[versión portátil ZIP](https://github.com/luucabg/cineleaf/releases/download/v0.3.0-beta.1/Cineleaf-0.3.0-beta.1-Windows-x64-Portable.zip)** que no se instala. Los usuarios avanzados pueden comprobar la descarga con el archivo de **[sumas SHA-256](https://github.com/luucabg/cineleaf/releases/download/v0.3.0-beta.1/Cineleaf-0.3.0-beta.1-Windows-SHA256SUMS.txt)**.
 
 > La versión de Windows es una beta para Windows 10/11 de 64 bits. El instalador no está firmado todavía, por lo que Windows puede mostrar una advertencia de SmartScreen. El código, las pruebas y el proceso de construcción son públicos.
 
@@ -48,7 +48,7 @@ Cineleaf está diseñado para responder al instante incluso en proyectos grandes
 - Prueba el hardware disponible y prefiere aceleración NVIDIA, Intel, AMD o Windows cuando funciona; si no, usa una alternativa compatible.
 - El instalador incluye todo lo necesario: no obliga a instalar .NET ni FFmpeg por separado.
 
-En un Ryzen 5 5600X, localizar lo visible dentro de 10.000 clips tuvo una mediana de **0,0079 ms**; validar un proyecto de una hora con 100 clips, **0,2289 ms**; y mover un clip con copia segura, historial y validación completa, **9,9172 ms**. Son medidas del motor, no una promesa de que toda exportación tarde lo mismo. Consulta [las medidas y sus límites](Documentation/PERFORMANCE.md).
+En un Ryzen 5 5600X, la última pasada aislada midió una mediana de **0,0040 ms** para localizar lo visible dentro de 10.000 clips, **0,3286 ms** para validar un proyecto de una hora con 100 clips y **11,8451 ms** para mover un clip con copia segura, historial y validación completa. Son medidas del motor, no una promesa de que toda exportación tarde lo mismo. Consulta [las medidas y sus límites](Documentation/PERFORMANCE.md).
 
 ## Controlarlo con una IA
 
@@ -56,8 +56,9 @@ Cineleaf incluye un servidor **MCP**, un puente estándar para que una IA compat
 
 - Examinar un proyecto y recibir identificadores claros de clips, pistas y recursos.
 - Preparar uno o hasta 32 vídeos por lote, manteniendo el orden de los resultados.
-- Mover, recortar, dividir, transformar, silenciar o borrar clips con tiempos exactos.
-- Añadir textos, subtítulos y marcadores, y exportar en H.264 o HEVC de 720p a 4K.
+- Mover, recortar, dividir, duplicar, transformar, silenciar o borrar clips con tiempos exactos.
+- Añadir pausas negras, quitar intervalos, separar audio y cambiar nombre, formato, fotogramas por segundo o resolución.
+- Añadir textos, subtítulos y marcadores, extraer audio o un fotograma, y exportar en H.264 o HEVC de 720p a 4K.
 - Ver primero un plan sin tocar archivos y ejecutar después exactamente ese plan.
 
 Todo sigue ocurriendo en tu ordenador. El puente solo puede acceder a las carpetas que tú autorices, no usa una nube de Cineleaf y valida cada proyecto con el motor nativo de Windows o Mac antes de guardarlo. Los trabajos usan claves de reintento: si una exportación se interrumpe, se puede continuar sin crear el proyecto dos veces.
@@ -83,6 +84,7 @@ El instalador genera un pequeño bloque de configuración para pegar en cualquie
 - Proyectos horizontales, verticales, cuadrados y 4:5; 24, 25, 30, 50 o 60 fps.
 - Importación de vídeo, audio e imágenes mediante botón, doble clic o arrastrar y soltar.
 - Varias pistas, mover, recortar, dividir, duplicar, borrar, borrado con cierre de hueco, deshacer y rehacer.
+- Pausas negras de cualquier duración, eliminación exacta de intervalos y separación del audio de un clip.
 - Marcadores, detección local de ritmos y revisión/eliminación de silencios.
 - Zoom y desplazamiento fluidos en una línea de tiempo virtualizada.
 - Vista previa compuesta en segundo plano con caché y cancelación.
@@ -90,11 +92,13 @@ El instalador genera un pequeño bloque de configuración para pegar en cualquie
 ### Efectos y creación
 
 - Posición, escala, rotación, recorte, opacidad, velocidad y reproducción inversa.
+- Cambio de formato, resolución y fotogramas por segundo; proyectos de 720p a 4K.
 - Exposición, contraste, saturación, temperatura, tinte, luces, sombras, nitidez y viñeta.
 - Desenfoque, nitidez, monocromo, sepia, bloom y viñeta.
 - Fundidos y transiciones de disolución, negro, deslizamiento, barrido y desenfoque.
 - Texto configurable y subtítulos sobre el vídeo.
 - Exportación MP4 H.264 o HEVC desde 720p hasta 4K, con audio AAC, progreso y cancelación.
+- Extracción del audio original a M4A y guardado del fotograma actual como PNG, ambos verificados antes de reemplazar un archivo.
 
 ### Subtítulos automáticos y privacidad
 
@@ -119,11 +123,13 @@ En Windows, Cineleaf puede transcribir el audio usando el reconocimiento instala
 | Borrar | Supr | Supr |
 | Duplicar | Ctrl+D | ⌘D |
 | Marcador | M | M |
+| Insertar pausa negra | Ctrl+Alt+G | ⌥⌘G |
+| Separar audio | Ctrl+Alt+A | ⌥⌘A |
 | Reproducir / pausar | Espacio | Espacio |
 
 ## Estado de calidad
 
-Windows pasa 33 pruebas unitarias, 21 pruebas del contrato MCP, 2 pruebas de integración con FFmpeg real y una exportación sintética que se vuelve a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. Mac mantiene sus pruebas automatizadas, suma una prueba del puente nativo de IA y verifica una exportación sintética en GitHub Actions.
+Windows pasa 39 pruebas unitarias, 28 pruebas del contrato MCP y 3 pruebas de integración con FFmpeg real, incluida la extracción de audio y fotogramas que se vuelven a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. El código Mac contiene 44 pruebas del motor, 17 de aplicación y 2 flujos de interfaz; GitHub Actions compila, ejecuta los casos de medios reales y crea los paquetes universales.
 
 No es honesto prometer que ningún programa tiene cero bugs. En esta beta no quedan fallos bloqueantes conocidos después de esas comprobaciones. La revisión visual por píxeles de Windows quedó pendiente porque la sesión de escritorio usada para construirlo estaba bloqueada; el proceso sí arrancó y permaneció estable. En Mac sigue pendiente una prueba manual completa en hardware físico. Consulta [STATUS.md](STATUS.md).
 

@@ -3,32 +3,36 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Cineleaf.Windows"
         Title="{DynamicResource AppName}" Width="1440" Height="900" MinWidth="1080" MinHeight="700"
+        Background="{StaticResource BackgroundBrush}" Foreground="{StaticResource TextBrush}" FontFamily="Segoe UI Variable, Segoe UI"
         WindowStartupLocation="CenterScreen" KeyDown="Window_KeyDown" Closing="Window_Closing">
   <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/><RowDefinition Height="255"/><RowDefinition Height="28"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="255"/><RowDefinition Height="28"/></Grid.RowDefinitions>
     <Border Grid.Row="0" Background="{StaticResource PanelBrush}" BorderBrush="#2A3932" BorderThickness="0,0,0,1">
-      <DockPanel Margin="8,6">
-        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+      <Grid Margin="8,6">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <WrapPanel Grid.Column="0" VerticalAlignment="Center">
           <Button Content="{DynamicResource New}" Click="New_Click" ToolTip="Ctrl+N"/>
           <Button Content="{DynamicResource Open}" Click="Open_Click" ToolTip="Ctrl+O"/>
           <Button Content="{DynamicResource Save}" Click="Save_Click" ToolTip="Ctrl+S"/>
+          <Button Content="{DynamicResource ProjectSettings}" Click="ProjectSettings_Click"/>
           <Separator Margin="5,4"/>
           <Button Content="{DynamicResource Import}" Click="Import_Click" ToolTip="Ctrl+I"/>
           <Button Content="{DynamicResource Undo}" Click="Undo_Click" ToolTip="Ctrl+Z"/>
           <Button Content="{DynamicResource Redo}" Click="Redo_Click" ToolTip="Ctrl+Y"/>
           <Button Content="{DynamicResource Split}" Click="Split_Click" ToolTip="Ctrl+B"/>
+          <Button Content="{DynamicResource InsertGap}" Click="InsertGap_Click" ToolTip="Ctrl+Alt+G"/>
           <Button Content="{DynamicResource Text}" Click="AddText_Click"/>
           <Button Content="{DynamicResource Captions}" Click="Captions_Click"/>
           <Button Content="{DynamicResource SubtitlesImport}" Click="ImportSubtitles_Click"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+        </WrapPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
           <TextBlock Text="{DynamicResource Language}" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Margin="8,0"/>
           <ComboBox x:Name="LanguageBox" Width="100" SelectionChanged="LanguageBox_SelectionChanged">
             <ComboBoxItem Tag="system" Content="{DynamicResource SystemLanguage}"/><ComboBoxItem Tag="en" Content="{DynamicResource English}"/><ComboBoxItem Tag="es" Content="{DynamicResource Spanish}"/>
           </ComboBox>
           <Button Content="{DynamicResource Export}" Background="{StaticResource AccentBrush}" Foreground="#07110C" FontWeight="SemiBold" Click="Export_Click" ToolTip="Ctrl+E"/>
         </StackPanel>
-      </DockPanel>
+      </Grid>
     </Border>
 
     <Grid Grid.Row="1">
@@ -77,13 +81,22 @@
               <TextBlock Text="{DynamicResource Volume}"/><TextBox x:Name="VolumeBox" Margin="0,3,0,9"/>
               <TextBlock Text="{DynamicResource Scale}"/><TextBox x:Name="ScaleBox" Margin="0,3,0,9"/>
               <TextBlock Text="{DynamicResource Rotation}"/><TextBox x:Name="RotationBox" Margin="0,3,0,9"/>
+              <TextBlock Text="{DynamicResource ContentMode}"/><ComboBox x:Name="ContentModeBox" Margin="0,3,0,9"><ComboBoxItem Tag="Fit" Content="{DynamicResource Fit}"/><ComboBoxItem Tag="Fill" Content="{DynamicResource Fill}"/><ComboBoxItem Tag="Crop" Content="{DynamicResource Crop}"/></ComboBox>
+              <UniformGrid Columns="2" Margin="0,0,0,7"><CheckBox x:Name="EnabledBox" Content="{DynamicResource Enabled}"/><CheckBox x:Name="ReverseBox" Content="{DynamicResource Reverse}"/></UniformGrid>
+              <CheckBox x:Name="HideVideoBox" Content="{DynamicResource HideVideo}" Margin="0,0,0,9"/>
+              <TextBlock Text="{DynamicResource FadeIn}"/><TextBox x:Name="FadeInBox" Margin="0,3,0,9"/>
+              <TextBlock Text="{DynamicResource FadeOut}"/><TextBox x:Name="FadeOutBox" Margin="0,3,0,9"/>
+              <TextBlock Text="{DynamicResource CropEdges}"/>
+              <UniformGrid Columns="2" Margin="0,3,0,9"><TextBox x:Name="CropTopBox" ToolTip="{DynamicResource CropTop}" Margin="0,0,3,3"/><TextBox x:Name="CropBottomBox" ToolTip="{DynamicResource CropBottom}" Margin="3,0,0,3"/><TextBox x:Name="CropLeftBox" ToolTip="{DynamicResource CropLeft}" Margin="0,3,3,0"/><TextBox x:Name="CropRightBox" ToolTip="{DynamicResource CropRight}" Margin="3,3,0,0"/></UniformGrid>
+              <TextBlock Text="{DynamicResource TransitionIn}"/><ComboBox x:Name="TransitionInBox" Margin="0,3,0,9"><ComboBoxItem Tag="None" Content="{DynamicResource None}"/><ComboBoxItem Tag="CrossDissolve" Content="{DynamicResource CrossDissolve}"/><ComboBoxItem Tag="FadeThroughBlack" Content="{DynamicResource FadeBlack}"/><ComboBoxItem Tag="SlideLeft" Content="{DynamicResource Slide}"/><ComboBoxItem Tag="WipeLeft" Content="{DynamicResource Wipe}"/><ComboBoxItem Tag="Blur" Content="{DynamicResource Blur}"/></ComboBox>
+              <TextBlock Text="{DynamicResource TransitionOut}"/><ComboBox x:Name="TransitionOutBox" Margin="0,3,0,9"><ComboBoxItem Tag="None" Content="{DynamicResource None}"/><ComboBoxItem Tag="CrossDissolve" Content="{DynamicResource CrossDissolve}"/><ComboBoxItem Tag="FadeThroughBlack" Content="{DynamicResource FadeBlack}"/><ComboBoxItem Tag="SlideRight" Content="{DynamicResource Slide}"/><ComboBoxItem Tag="WipeLeft" Content="{DynamicResource Wipe}"/><ComboBoxItem Tag="Blur" Content="{DynamicResource Blur}"/></ComboBox>
               <TextBlock Text="{DynamicResource Text}"/><TextBox x:Name="TextContentBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="54" Margin="0,3,0,9"/>
               <Button Content="{DynamicResource Apply}" Background="{StaticResource AccentBrush}" Foreground="#07110C" Click="ApplyInspector_Click"/>
               <Separator Margin="0,9"/>
               <TextBlock Text="{DynamicResource Effect}"/>
-              <ComboBox x:Name="EffectBox" Margin="0,4"><ComboBoxItem Tag="GaussianBlur">Blur</ComboBoxItem><ComboBoxItem Tag="Sharpen">Sharpen</ComboBoxItem><ComboBoxItem Tag="Vignette">Vignette</ComboBoxItem><ComboBoxItem Tag="Monochrome">Monochrome</ComboBoxItem><ComboBoxItem Tag="Sepia">Sepia</ComboBoxItem><ComboBoxItem Tag="Bloom">Bloom</ComboBoxItem></ComboBox>
+              <ComboBox x:Name="EffectBox" Margin="0,4"><ComboBoxItem Tag="GaussianBlur" Content="{DynamicResource Blur}"/><ComboBoxItem Tag="Sharpen" Content="{DynamicResource Sharpen}"/><ComboBoxItem Tag="Vignette" Content="{DynamicResource Vignette}"/><ComboBoxItem Tag="Monochrome" Content="{DynamicResource Monochrome}"/><ComboBoxItem Tag="Sepia" Content="{DynamicResource Sepia}"/><ComboBoxItem Tag="Bloom" Content="{DynamicResource Bloom}"/></ComboBox>
               <Button Content="{DynamicResource AddEffect}" Click="AddEffect_Click"/>
-              <WrapPanel><Button Content="{DynamicResource Duplicate}" Click="Duplicate_Click"/><Button Content="{DynamicResource RippleDelete}" Click="RippleDelete_Click"/><Button Content="{DynamicResource Marker}" Click="Marker_Click"/><Button Content="{DynamicResource FindBeats}" Click="FindBeats_Click"/><Button Content="{DynamicResource RemoveSilence}" Click="RemoveSilence_Click"/></WrapPanel>
+              <WrapPanel><Button Content="{DynamicResource Duplicate}" Click="Duplicate_Click"/><Button Content="{DynamicResource DetachAudio}" Click="DetachAudio_Click"/><Button Content="{DynamicResource ExtractAudio}" Click="ExtractAudio_Click"/><Button Content="{DynamicResource SaveFrame}" Click="SaveFrame_Click"/><Button Content="{DynamicResource RippleDelete}" Click="RippleDelete_Click"/><Button Content="{DynamicResource Marker}" Click="Marker_Click"/><Button Content="{DynamicResource FindBeats}" Click="FindBeats_Click"/><Button Content="{DynamicResource RemoveSilence}" Click="RemoveSilence_Click"/></WrapPanel>
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

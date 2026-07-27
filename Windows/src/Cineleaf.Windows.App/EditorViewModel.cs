@@ -17,6 +17,7 @@ public sealed class EditorViewModel : IDisposable
     private readonly PreviewCacheService _previewCache;
     private readonly OnDeviceCaptionService _captions;
     private readonly WaveformService _waveforms;
+    private readonly MediaUtilityService _mediaUtilities;
     private readonly ProjectPackageStore _store = new();
     private ProjectEditor _editor;
     private CancellationTokenSource? _previewCancellation;
@@ -33,6 +34,7 @@ public sealed class EditorViewModel : IDisposable
         _previewCache = new PreviewCacheService(_renderer, Path.Combine(cache, "Preview"));
         _captions = new OnDeviceCaptionService(_toolchain);
         _waveforms = new WaveformService(_toolchain);
+        _mediaUtilities = new MediaUtilityService(_toolchain, _inspector);
         _editor = new ProjectEditor(CreateProject("Untitled", CanvasPreset.Landscape16x9, ProjectFrameRate.Fps30));
         RefreshCollections();
     }
@@ -63,6 +65,13 @@ public sealed class EditorViewModel : IDisposable
         Playhead = RationalTime.Zero;
         _isDirty = false;
         NotifyProjectChanged(renderPreview: false);
+    }
+
+    public void UpdateProjectSettings(string name, CanvasPreset canvas, ProjectFrameRate frameRate)
+    {
+        _editor.UpdateProjectSettings(name, canvas, frameRate);
+        _isDirty = true;
+        NotifyProjectChanged(renderPreview: true);
     }
 
     public async Task OpenAsync(string packagePath, CancellationToken cancellationToken = default)
@@ -300,6 +309,66 @@ public sealed class EditorViewModel : IDisposable
         NotifyProjectChanged(renderPreview: true);
     }
 
+    public void DetachSelectedAudio()
+    {
+        if (SelectedClipId is not { } id) return;
+        SelectedClipId = _editor.DetachAudio(id);
+        _isDirty = true;
+        NotifyProjectChanged(renderPreview: true);
+    }
+
+    public void InsertGap(double durationSeconds)
+    {
+        _editor.InsertGap(Playhead, RationalTime.FromSeconds(durationSeconds));
+        _isDirty = true;
+        Reselect();
+        NotifyProjectChanged(renderPreview: true);
+    }
+
+    public async Task<AudioExtractionResult> ExtractSelectedAudioAsync(
+        string destination,
+        CancellationToken cancellationToken = default)
+    {
+        var (asset, clip) = SelectedAudioSource();
+        SetStatus("Working");
+        try
+        {
+            var start = TimeSpan.FromSeconds(clip?.SourceStart.Seconds ?? 0);
+            TimeSpan? duration = clip is null ? null : TimeSpan.FromSeconds(clip.Duration.Seconds * clip.PlaybackRate);
+            return await _mediaUtilities.ExtractAudioAsync(
+                asset.Reference.LastKnownPath, destination, start, duration, overwrite: true, cancellationToken);
+        }
+        finally { SetStatus("Ready"); }
+    }
+
+    public async Task<FrameExtractionResult> ExtractCurrentFrameAsync(
+        string destination,
+        CancellationToken cancellationToken = default)
+    {
+        var clip = SelectedClip ?? throw new InvalidOperationException("Select a video or image clip first.");
+        if (clip.Kind is not ClipKind.Video and not ClipKind.Image || clip.AssetId is not { } assetId)
+            throw new InvalidOperationException("Select a video or image clip first.");
+        var asset = Project.Assets.First(item => item.Id == assetId);
+        var local = Math.Clamp(Playhead.Seconds - clip.TimelineStart.Seconds, 0, clip.Duration.Seconds);
+        var sourceDuration = clip.Duration.Seconds * clip.PlaybackRate;
+        var sourceOffset = clip.Kind == ClipKind.Image ? 0 : clip.IsReversed
+            ? Math.Max(0, sourceDuration - local * clip.PlaybackRate - 1d / FrameRateValue(Project.FrameRate))
+            : local * clip.PlaybackRate;
+        if (clip.Kind == ClipKind.Video)
+            sourceOffset = Math.Min(sourceOffset, Math.Max(0, sourceDuration - 1d / FrameRateValue(Project.FrameRate)));
+        SetStatus("Working");
+        try
+        {
+            return await _mediaUtilities.ExtractFrameAsync(
+                asset.Reference.LastKnownPath,
+                destination,
+                TimeSpan.FromSeconds(clip.SourceStart.Seconds + sourceOffset),
+                overwrite: true,
+                cancellationToken);
+        }
+        finally { SetStatus("Ready"); }
+    }
+
     public void ApplySelectedClip(
         string name,
         double start,
@@ -309,7 +378,19 @@ public sealed class EditorViewModel : IDisposable
         double volume,
         double scale,
         double rotation,
-        string? text)
+        string? text,
+        ContentMode contentMode,
+        bool enabled,
+        bool reversed,
+        bool hideVideo,
+        double fadeIn,
+        double fadeOut,
+        double cropTop,
+        double cropBottom,
+        double cropLeft,
+        double cropRight,
+        TransitionKind? transitionIn,
+        TransitionKind? transitionOut)
     {
         if (SelectedClipId is not { } id) return;
         _editor.UpdateClip(id, clip =>
@@ -322,6 +403,25 @@ public sealed class EditorViewModel : IDisposable
             clip.AudioVolume = Math.Clamp(volume, 0, 2);
             clip.Transform.Scale = Math.Clamp(scale, 0.05, 8);
             clip.Transform.RotationDegrees = Math.Clamp(rotation, -360, 360);
+            clip.Transform.ContentMode = contentMode;
+            clip.IsEnabled = enabled;
+            clip.IsVideoMuted = hideVideo;
+            if (clip.Kind is ClipKind.Video or ClipKind.Audio) clip.IsReversed = reversed;
+            var half = clip.Duration.Seconds / 2;
+            var safeFadeIn = RationalTime.FromSeconds(Math.Clamp(fadeIn, 0, half));
+            var safeFadeOut = RationalTime.FromSeconds(Math.Clamp(fadeOut, 0, half));
+            clip.Fades.VideoIn = safeFadeIn;
+            clip.Fades.VideoOut = safeFadeOut;
+            clip.Fades.AudioIn = safeFadeIn;
+            clip.Fades.AudioOut = safeFadeOut;
+            (clip.Transform.CropTop, clip.Transform.CropBottom) = NormalizeCropPair(cropTop, cropBottom);
+            (clip.Transform.CropLeading, clip.Transform.CropTrailing) = NormalizeCropPair(cropLeft, cropRight);
+            if (clip.Kind is ClipKind.Video or ClipKind.Image)
+            {
+                var transitionDuration = RationalTime.FromSeconds(Math.Min(0.5, clip.Duration.Seconds));
+                clip.TransitionIn = transitionIn is { } incoming ? new ClipTransition { Kind = incoming, Duration = transitionDuration } : null;
+                clip.TransitionOut = transitionOut is { } outgoing ? new ClipTransition { Kind = outgoing, Duration = transitionDuration } : null;
+            }
             if (clip.TextStyle is not null && text is not null) clip.TextStyle.Text = text;
         });
         _isDirty = true;
@@ -478,6 +578,16 @@ public sealed class EditorViewModel : IDisposable
         var width = Math.Max(2, (int)Math.Round(canvas.Width * scale / 2) * 2);
         var height = Math.Max(2, (int)Math.Round(canvas.Height * scale / 2) * 2);
         return new Resolution(width, height);
+    }
+
+    private static (double First, double Second) NormalizeCropPair(double first, double second)
+    {
+        first = Math.Clamp(first, 0, 0.95);
+        second = Math.Clamp(second, 0, 0.95);
+        var total = first + second;
+        if (total < 0.95) return (first, second);
+        var scale = 0.95 / total;
+        return (first * scale, second * scale);
     }
 
     public void Dispose()

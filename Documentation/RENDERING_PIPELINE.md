@@ -4,6 +4,8 @@ On Windows, `Cineleaf.Windows.Media` builds an FFmpeg filter graph for the compo
 
 Preview and export start from the same validated project snapshot and render decisions.
 
+Audio extraction and frame capture use a smaller derived-media path. Windows invokes FFmpeg without a command shell; Mac uses AVFoundation/ImageIO. Both validate time ranges and extensions, write to a unique temporary file beside the destination, inspect the produced media, and only then promote it atomically. Failure or cancellation removes the temporary result and preserves any previous destination.
+
 1. Resolve enabled media through a security-scoped, project-relative, or last-known file reference.
 2. For preview, prefer a valid 540p proxy when present. For export, always resolve the original source.
 3. Reuse cached AVFoundation assets, tracks, source geometry, and a matching composition revision.
@@ -22,6 +24,7 @@ Preview and export start from the same validated project snapshot and render dec
 - Thumbnail, waveform, proxy, reverse, and preview work uses stable modification-aware keys and bounded memory/disk stores.
 - Cache clearing never removes original media, collected project media, or project JSON.
 - A proxy changes preview decoding cost only. It cannot lower final export quality.
+- Extracting original audio or a source frame does not rebuild the full timeline composition and runs away from the interface thread.
 
 ## Current transition scope
 

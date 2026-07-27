@@ -264,6 +264,29 @@ final class MediaPipelineIntegrationTests: XCTestCase {
         XCTAssertEqual(inspection.metadata.resolution, Resolution(width: 320, height: 180))
     }
 
+    func testMediaUtilitiesExtractVerifiedAudioAndFrameFiles() async throws {
+        let audioURL = temporaryDirectory.appendingPathComponent("source.caf")
+        let videoURL = temporaryDirectory.appendingPathComponent("source.mov")
+        let extractedAudio = temporaryDirectory.appendingPathComponent("audio.m4a")
+        let extractedFrame = temporaryDirectory.appendingPathComponent("frame.png")
+        try SyntheticMediaFactory.makeAudio(at: audioURL)
+        try await SyntheticMediaFactory.makeVideo(at: videoURL)
+        let service = MediaUtilityService()
+
+        let audio = try await service.extractAudio(from: audioURL, to: extractedAudio)
+        let frame = try await service.extractFrame(
+            from: videoURL,
+            to: extractedFrame,
+            at: RationalTime(value: 1, timescale: 2)
+        )
+
+        XCTAssertTrue(audio.hasAudio)
+        XCTAssertEqual(audio.duration.seconds, 1, accuracy: 0.08)
+        XCTAssertEqual(frame.resolution, Resolution(width: 320, height: 180))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedAudio.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: extractedFrame.path))
+    }
+
     func testConsolidatedMediaResolvesRelativeToMovedProject() async throws {
         let source = temporaryDirectory.appendingPathComponent("source.dat")
         let originalPackage = temporaryDirectory.appendingPathComponent("Original.cineleaf", isDirectory: true)

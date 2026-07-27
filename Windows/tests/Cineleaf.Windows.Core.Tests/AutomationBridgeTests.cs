@@ -29,6 +29,8 @@ public sealed class AutomationBridgeTests : IDisposable
 
         Assert.Equal(1, result.ProtocolVersion);
         Assert.Contains("render-project", result.Commands);
+        Assert.Contains("extract-audio", result.Commands);
+        Assert.Contains("extract-frame", result.Commands);
         Assert.Equal(4, result.MaxBatchConcurrency);
     }
 

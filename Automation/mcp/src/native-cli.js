@@ -32,6 +32,18 @@ export class NativeCliAdapter {
     return this.#run(["render-project", projectPath, outputPath, options.resolution, options.codec, options.quality], signal, onProgress);
   }
 
+  async extractAudio(inputPath, outputPath, options, signal) {
+    return this.#run([
+      "extract-audio", inputPath, outputPath,
+      String(options.startSeconds ?? 0),
+      options.durationSeconds == null ? "all" : String(options.durationSeconds)
+    ], signal);
+  }
+
+  async extractFrame(inputPath, outputPath, options, signal) {
+    return this.#run(["extract-frame", inputPath, outputPath, String(options.atSeconds ?? 0)], signal);
+  }
+
   #run(argumentsList, signal, onProgress) {
     return new Promise((resolve, reject) => {
       const child = spawn(this.executable, [...this.prefixArguments, ...argumentsList], {

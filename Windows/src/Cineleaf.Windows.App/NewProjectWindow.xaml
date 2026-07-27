@@ -1,10 +1,11 @@
 <Window x:Class="Cineleaf.Windows.NewProjectWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="{DynamicResource New}" Width="390" Height="390" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+        Title="{DynamicResource New}" Width="390" Height="390" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource BackgroundBrush}" Foreground="{StaticResource TextBrush}" FontFamily="Segoe UI Variable, Segoe UI">
   <Grid Margin="22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TextBlock Text="{DynamicResource New}" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18"/>
+    <TextBlock x:Name="Heading" Text="{DynamicResource New}" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18"/>
     <StackPanel Grid.Row="1"><TextBlock Text="{DynamicResource ProjectName}"/><TextBox x:Name="NameBox" Text="My video" Margin="0,5,0,14"/></StackPanel>
     <StackPanel Grid.Row="2"><TextBlock Text="{DynamicResource Canvas}"/><ComboBox x:Name="CanvasBox" SelectedIndex="0" Margin="0,5,0,14"><ComboBoxItem Tag="Landscape16x9">16:9 — 1920×1080</ComboBoxItem><ComboBoxItem Tag="Vertical9x16">9:16 — 1080×1920</ComboBoxItem><ComboBoxItem Tag="Square1x1">1:1 — 1080×1080</ComboBoxItem><ComboBoxItem Tag="Portrait4x5">4:5 — 1080×1350</ComboBoxItem></ComboBox>
       <TextBlock Text="{DynamicResource FrameRate}"/><ComboBox x:Name="FrameRateBox" SelectedIndex="2" Margin="0,5"><ComboBoxItem Tag="Fps24">24</ComboBoxItem><ComboBoxItem Tag="Fps25">25</ComboBoxItem><ComboBoxItem Tag="Fps30">30</ComboBoxItem><ComboBoxItem Tag="Fps50">50</ComboBoxItem><ComboBoxItem Tag="Fps60">60</ComboBoxItem></ComboBox></StackPanel>
-    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource Cancel}" Click="Cancel_Click"/><Button Content="{DynamicResource Create}" Background="{StaticResource AccentBrush}" Foreground="#07110C" Click="Create_Click"/></StackPanel>
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="{DynamicResource Cancel}" Click="Cancel_Click"/><Button x:Name="SubmitButton" Content="{DynamicResource Create}" Background="{StaticResource AccentBrush}" Foreground="#07110C" Click="Create_Click"/></StackPanel>
   </Grid>
 </Window>

@@ -175,3 +175,74 @@ test("rejects delete operations that contain an unknown clip ID", async () => {
     error => error.code === "clip_not_found"
   );
 });
+
+test("changes project resolution and fps, inserts a black pause, duplicates, and detaches audio", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-utilities-"));
+  const service = new ProjectService({ roots: [root], adapter });
+  const projectPath = path.join(root, "utilities.cineleaf");
+  await service.createVideo({
+    projectPath,
+    media: [{ path: path.join(root, "one.mp4"), durationSeconds: 10 }],
+    idempotencyKey: "create",
+    confirmWrite: true
+  });
+  const clipId = (await service.inspectProject({ projectPath })).clips[0].id;
+
+  await service.editProject({
+    projectPath,
+    operations: [
+      { type: "update_project_settings", name: "Vertical cut", canvasPreset: "vertical9x16", frameRate: 60, exportResolution: "p2160" },
+      { type: "add_marker", atSeconds: 4, name: "Pause" },
+      { type: "insert_gap", atSeconds: 4, durationSeconds: 2 },
+      { type: "duplicate_clip", clipId },
+      { type: "detach_audio", clipId }
+    ],
+    dryRun: false,
+    confirmWrite: true,
+    idempotencyKey: "utility-pass"
+  });
+
+  const project = JSON.parse(await readFile(path.join(projectPath, "project.json"), "utf8"));
+  const clips = project.timeline.tracks.flatMap(track => track.clips);
+  assert.equal(project.name, "Vertical cut");
+  assert.deepEqual(project.canvas, { width: 1080, height: 1920 });
+  assert.equal(project.frameRate, "fps60");
+  assert.equal(project.exportPreferences.resolution, "p2160");
+  assert.deepEqual(project.timeline.markers[0].time, { value: 6, timescale: 1 });
+  assert.equal(clips.filter(clip => clip.kind === "video").length, 3);
+  assert.equal(clips.filter(clip => clip.kind === "audio").length, 1);
+  assert.equal(clips.find(clip => clip.id === clipId).audioVolume, 0);
+});
+
+test("removes an arbitrary timeline range and preserves exact source continuity", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-range-"));
+  const service = new ProjectService({ roots: [root], adapter });
+  const projectPath = path.join(root, "range.cineleaf");
+  await service.createVideo({ projectPath, media: [{ path: path.join(root, "one.mp4"), durationSeconds: 10 }], idempotencyKey: "create", confirmWrite: true });
+
+  await service.editProject({
+    projectPath,
+    operations: [{ type: "remove_time_range", startSeconds: 3, durationSeconds: 2 }],
+    dryRun: false,
+    confirmWrite: true,
+    idempotencyKey: "remove-range"
+  });
+
+  const project = JSON.parse(await readFile(path.join(projectPath, "project.json"), "utf8"));
+  const clips = project.timeline.tracks[0].clips;
+  assert.deepEqual(clips.map(clip => clip.timelineStart), [{ value: 0, timescale: 1 }, { value: 3, timescale: 1 }]);
+  assert.deepEqual(clips.map(clip => clip.duration), [{ value: 3, timescale: 1 }, { value: 5, timescale: 1 }]);
+  assert.deepEqual(clips[1].sourceStart, { value: 5, timescale: 1 });
+});
+
+test("rejects a black pause after all timeline content instead of reporting a no-op", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-gap-end-"));
+  const service = new ProjectService({ roots: [root], adapter });
+  const projectPath = path.join(root, "gap-end.cineleaf");
+  await service.createVideo({ projectPath, media: [{ path: path.join(root, "one.mp4"), durationSeconds: 10 }], idempotencyKey: "create", confirmWrite: true });
+
+  await assert.rejects(
+    service.editProject({ projectPath, operations: [{ type: "insert_gap", atSeconds: 10, durationSeconds: 1 }], dryRun: true }),
+    error => error.code === "invalid_gap"
+  );
+});

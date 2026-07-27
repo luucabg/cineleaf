@@ -1,0 +1,17 @@
+<Window x:Class="Cineleaf.Windows.InsertGapWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource InsertGap}" Width="360" Height="270" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource BackgroundBrush}" Foreground="{StaticResource TextBrush}" FontFamily="Segoe UI Variable, Segoe UI">
+  <Grid Margin="22">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock Text="{DynamicResource InsertGap}" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,14"/>
+    <StackPanel Grid.Row="1">
+      <TextBlock Text="{DynamicResource GapExplanation}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
+      <TextBlock Text="{DynamicResource GapDuration}"/>
+      <TextBox x:Name="DurationBox" Text="1" Margin="0,5,0,0"/>
+    </StackPanel>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Content="{DynamicResource Cancel}" Click="Cancel_Click"/>
+      <Button Content="{DynamicResource Insert}" Background="{StaticResource AccentBrush}" Foreground="#07110C" Click="Insert_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

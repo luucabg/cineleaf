@@ -17,10 +17,23 @@
   <system:String x:Key="Timeline">Timeline</system:String><system:String x:Key="Language">Language</system:String>
   <system:String x:Key="SystemLanguage">System</system:String><system:String x:Key="English">English</system:String><system:String x:Key="Spanish">Español</system:String>
   <system:String x:Key="Ready">Ready</system:String><system:String x:Key="Working">Working…</system:String>
+  <system:String x:Key="CompactQuality">Compact</system:String><system:String x:Key="BalancedQuality">Balanced</system:String><system:String x:Key="HighQuality">High</system:String>
   <system:String x:Key="ExportTitle">Export video</system:String><system:String x:Key="Resolution">Resolution</system:String>
   <system:String x:Key="Codec">Format</system:String><system:String x:Key="Quality">Quality</system:String><system:String x:Key="Cancel">Cancel</system:String>
   <system:String x:Key="ProjectName">Project name</system:String><system:String x:Key="Create">Create</system:String>
   <system:String x:Key="Canvas">Canvas</system:String><system:String x:Key="FrameRate">Frames per second</system:String>
   <system:String x:Key="ErrorTitle">Cineleaf could not complete that action</system:String>
   <system:String x:Key="AboutText">Free, private video editing. Everything stays on this computer.</system:String>
+  <system:String x:Key="ProjectSettings">Project settings</system:String><system:String x:Key="InsertGap">Insert black pause</system:String>
+  <system:String x:Key="GapExplanation">Moves everything after the playhead to create a black, silent pause. Clips crossing the playhead are split safely.</system:String>
+  <system:String x:Key="GapDuration">Pause duration (seconds)</system:String><system:String x:Key="GapInvalid">Enter a duration greater than 0 and no longer than 24 hours.</system:String><system:String x:Key="Insert">Insert</system:String>
+  <system:String x:Key="DetachAudio">Detach audio</system:String><system:String x:Key="ExtractAudio">Extract original audio</system:String><system:String x:Key="SaveFrame">Save current frame</system:String>
+  <system:String x:Key="AudioExtracted">Audio extracted and verified.</system:String><system:String x:Key="FrameSaved">PNG frame saved and verified.</system:String>
+  <system:String x:Key="ContentMode">Sizing</system:String><system:String x:Key="Fit">Fit</system:String><system:String x:Key="Fill">Fill</system:String><system:String x:Key="Crop">Crop to fill</system:String>
+  <system:String x:Key="Enabled">Enabled</system:String><system:String x:Key="Reverse">Reverse</system:String><system:String x:Key="HideVideo">Hide video (keep audio)</system:String>
+  <system:String x:Key="FadeIn">Fade in (seconds)</system:String><system:String x:Key="FadeOut">Fade out (seconds)</system:String><system:String x:Key="CropEdges">Crop edges (0 to 0.95)</system:String>
+  <system:String x:Key="CropTop">Top</system:String><system:String x:Key="CropBottom">Bottom</system:String><system:String x:Key="CropLeft">Left</system:String><system:String x:Key="CropRight">Right</system:String>
+  <system:String x:Key="TransitionIn">Entrance transition</system:String><system:String x:Key="TransitionOut">Exit transition</system:String><system:String x:Key="None">None</system:String>
+  <system:String x:Key="CrossDissolve">Cross dissolve</system:String><system:String x:Key="FadeBlack">Fade through black</system:String><system:String x:Key="Slide">Slide</system:String><system:String x:Key="Wipe">Wipe</system:String><system:String x:Key="Blur">Blur</system:String>
+  <system:String x:Key="Sharpen">Sharpen</system:String><system:String x:Key="Vignette">Vignette</system:String><system:String x:Key="Monochrome">Monochrome</system:String><system:String x:Key="Sepia">Sepia</system:String><system:String x:Key="Bloom">Bloom</system:String>
 </ResourceDictionary>

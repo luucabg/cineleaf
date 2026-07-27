@@ -90,13 +90,103 @@ public sealed class ProjectEditor
             if (track.IsLocked) throw new InvalidEditException($"Track {track.Name} is locked.");
             var duplicate = ProjectCodec.Clone(candidate).Timeline.Tracks.SelectMany(item => item.Clips).First(item => item.Id == clipId);
             duplicate.Id = duplicateId;
-            duplicate.TimelineStart = clip.TimelineEnd;
+            duplicate.TimelineStart = FirstAvailableStart(track.Clips, clip.TimelineEnd, clip.Duration, clip.Id);
             duplicate.GroupId = null;
             duplicate.LinkGroupId = null;
             track.Clips.Add(duplicate);
         });
         return duplicateId;
     }
+
+    public Guid DetachAudio(Guid clipId, Guid? audioTrackId = null)
+    {
+        var detachedId = Guid.NewGuid();
+        Commit(candidate =>
+        {
+            var (sourceTrack, source) = Find(candidate, clipId);
+            if (sourceTrack.IsLocked) throw new InvalidEditException($"Track {sourceTrack.Name} is locked.");
+            if (source.Kind != ClipKind.Video || source.AssetId is not { } assetId ||
+                candidate.Assets.FirstOrDefault(asset => asset.Id == assetId)?.Metadata.HasAudio != true)
+                throw new InvalidEditException("The selected video does not contain detachable audio.");
+
+            TimelineTrack? destination = null;
+            if (audioTrackId is { } requested)
+                destination = candidate.Timeline.Tracks.FirstOrDefault(track => track.Id == requested);
+            else
+                destination = candidate.Timeline.Tracks.FirstOrDefault(track =>
+                    track.Kind == TrackKind.Audio && !track.IsLocked && track.Clips.All(clip => !Intersects(clip, source)));
+            if (destination is null && audioTrackId is null)
+            {
+                destination = new TimelineTrack
+                {
+                    Name = $"A{candidate.Timeline.Tracks.Count(track => track.Kind == TrackKind.Audio) + 1}",
+                    Kind = TrackKind.Audio
+                };
+                candidate.Timeline.Tracks.Add(destination);
+            }
+            if (destination is null || destination.Kind != TrackKind.Audio || destination.IsLocked ||
+                destination.Clips.Any(clip => Intersects(clip, source)))
+                throw new InvalidEditException("Choose an unlocked audio track without another clip in that range.");
+
+            var detached = CloneClip(candidate, source.Id);
+            detached.Id = detachedId;
+            detached.Kind = ClipKind.Audio;
+            detached.IsVideoMuted = true;
+            detached.Transform = new ClipTransform();
+            detached.Opacity = 1;
+            detached.GroupId = null;
+            detached.LinkGroupId = null;
+            source.AudioVolume = 0;
+            destination.Clips.Add(detached);
+            destination.Clips = destination.Clips.OrderBy(clip => clip.TimelineStart).ToList();
+        });
+        return detachedId;
+    }
+
+    public void InsertGap(RationalTime time, RationalTime duration)
+    {
+        if (time < RationalTime.Zero || time >= Project.Timeline.Duration || duration <= RationalTime.Zero)
+            throw new InvalidEditException("A pause needs a valid position and positive duration.");
+        Commit(candidate =>
+        {
+            foreach (var track in candidate.Timeline.Tracks)
+            {
+                if (track.IsLocked && track.Clips.Any(clip => clip.TimelineEnd > time))
+                    throw new InvalidEditException($"Track {track.Name} is locked.");
+                var edited = new List<TimelineClip>();
+                foreach (var clip in track.Clips)
+                {
+                    if (clip.TimelineStart >= time)
+                    {
+                        clip.TimelineStart += duration;
+                        edited.Add(clip);
+                    }
+                    else if (clip.TimelineEnd > time)
+                    {
+                        var leftDuration = time - clip.TimelineStart;
+                        var rightDuration = clip.TimelineEnd - time;
+                        edited.Add(Segment(candidate, clip, RationalTime.Zero, leftDuration, preserveId: true));
+                        var right = Segment(candidate, clip, leftDuration, rightDuration, preserveId: false);
+                        right.TimelineStart = time + duration;
+                        edited.Add(right);
+                    }
+                    else edited.Add(clip);
+                }
+                track.Clips = edited.OrderBy(clip => clip.TimelineStart).ToList();
+            }
+            foreach (var marker in candidate.Timeline.Markers.Where(marker => marker.Time >= time)) marker.Time += duration;
+            candidate.Timeline.Markers = candidate.Timeline.Markers.OrderBy(marker => marker.Time).ToList();
+        });
+    }
+
+    public void UpdateProjectSettings(string name, CanvasPreset preset, ProjectFrameRate frameRate) => Commit(candidate =>
+    {
+        candidate.Name = string.IsNullOrWhiteSpace(name) ? "Untitled" : name.Trim();
+        candidate.CanvasPreset = preset;
+        candidate.Canvas = CanvasResolution(preset);
+        candidate.FrameRate = frameRate;
+        candidate.ExportPreferences.FrameRate = frameRate;
+    });
 
     public void AddClip(TimelineClip clip, Guid trackId) => Commit(candidate =>
     {
@@ -248,6 +338,78 @@ public sealed class ProjectEditor
     }
 
     private static RationalTime Scale(RationalTime time, double factor) => RationalTime.FromSeconds(time.Seconds * factor);
+
+    private static Resolution CanvasResolution(CanvasPreset preset) => preset switch
+    {
+        CanvasPreset.Vertical9x16 => new Resolution(1080, 1920),
+        CanvasPreset.Square1x1 => new Resolution(1080, 1080),
+        CanvasPreset.Portrait4x5 => new Resolution(1080, 1350),
+        _ => new Resolution(1920, 1080)
+    };
+
+    private static bool Intersects(TimelineClip left, TimelineClip right) =>
+        left.TimelineStart < right.TimelineEnd && right.TimelineStart < left.TimelineEnd;
+
+    private static TimelineClip CloneClip(CineleafProject project, Guid clipId) => ProjectCodec.Clone(project)
+        .Timeline.Tracks.SelectMany(track => track.Clips).First(clip => clip.Id == clipId);
+
+    private static TimelineClip Segment(
+        CineleafProject project,
+        TimelineClip original,
+        RationalTime offset,
+        RationalTime duration,
+        bool preserveId)
+    {
+        var segment = CloneClip(project, original.Id);
+        if (!preserveId) segment.Id = Guid.NewGuid();
+        segment.TimelineStart = original.TimelineStart + offset;
+        segment.Duration = duration;
+        if (original.Kind is not ClipKind.Text and not ClipKind.Image)
+        {
+            if (original.IsReversed)
+            {
+                var trailingDuration = original.Duration - offset - duration;
+                segment.SourceStart = original.SourceStart + Scale(trailingDuration, original.PlaybackRate);
+            }
+            else segment.SourceStart = original.SourceStart + Scale(offset, original.PlaybackRate);
+        }
+        if (offset > RationalTime.Zero) segment.TransitionIn = null;
+        if (offset + duration < original.Duration) segment.TransitionOut = null;
+        var half = RationalTime.FromSeconds(duration.Seconds / 2);
+        segment.Fades.VideoIn = Min(segment.Fades.VideoIn, half);
+        segment.Fades.VideoOut = Min(segment.Fades.VideoOut, half);
+        segment.Fades.AudioIn = Min(segment.Fades.AudioIn, half);
+        segment.Fades.AudioOut = Min(segment.Fades.AudioOut, half);
+        segment.Keyframes.PositionX = Rebase(original.Keyframes.PositionX, offset, duration);
+        segment.Keyframes.PositionY = Rebase(original.Keyframes.PositionY, offset, duration);
+        segment.Keyframes.Scale = Rebase(original.Keyframes.Scale, offset, duration);
+        segment.Keyframes.RotationDegrees = Rebase(original.Keyframes.RotationDegrees, offset, duration);
+        segment.Keyframes.Opacity = Rebase(original.Keyframes.Opacity, offset, duration);
+        segment.Keyframes.Volume = Rebase(original.Keyframes.Volume, offset, duration);
+        return segment;
+    }
+
+    private static List<ScalarKeyframe> Rebase(IEnumerable<ScalarKeyframe> frames, RationalTime offset, RationalTime duration) =>
+        frames.Where(frame => frame.Time >= offset && frame.Time <= offset + duration)
+            .Select(frame => frame with { Time = frame.Time - offset }).ToList();
+
+    private static RationalTime Min(RationalTime left, RationalTime right) => left < right ? left : right;
+
+    private static RationalTime FirstAvailableStart(
+        IEnumerable<TimelineClip> clips,
+        RationalTime start,
+        RationalTime duration,
+        Guid excludedId)
+    {
+        var candidate = start;
+        foreach (var clip in clips.Where(clip => clip.Id != excludedId).OrderBy(clip => clip.TimelineStart))
+        {
+            if (clip.TimelineEnd <= candidate) continue;
+            if (candidate + duration <= clip.TimelineStart) return candidate;
+            candidate = clip.TimelineEnd;
+        }
+        return candidate;
+    }
 
     private static List<RationalTimeRange> MergeRanges(IEnumerable<RationalTimeRange> ranges)
     {

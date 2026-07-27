@@ -34,7 +34,7 @@ public sealed class AutomationBridgeService(FfmpegToolchain? toolchain)
     public static AutomationCapabilities Capabilities() => new(
         1,
         "windows",
-        ["capabilities", "inspect-media", "validate-project", "render-project"],
+        ["capabilities", "inspect-media", "validate-project", "render-project", "extract-audio", "extract-frame"],
         ["h264", "hevc"],
         ["p720", "p1080", "p1440", "p2160"],
         32,
@@ -96,6 +96,33 @@ public sealed class AutomationBridgeService(FfmpegToolchain? toolchain)
             new RenderRequest(project, Path.GetFullPath(outputPath), outputResolution, frameRate, codec, quality, Preview: false),
             progress,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<AudioExtractionResult> ExtractAudioAsync(
+        string sourcePath,
+        string outputPath,
+        double startSeconds,
+        double? durationSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        var activeToolchain = toolchain ?? throw new InvalidOperationException("FFmpeg tools are unavailable.");
+        var inspector = new MediaInspector(activeToolchain);
+        return await new MediaUtilityService(activeToolchain, inspector).ExtractAudioAsync(
+            sourcePath, outputPath, TimeSpan.FromSeconds(startSeconds),
+            durationSeconds is { } duration ? TimeSpan.FromSeconds(duration) : null,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<FrameExtractionResult> ExtractFrameAsync(
+        string sourcePath,
+        string outputPath,
+        double atSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        var activeToolchain = toolchain ?? throw new InvalidOperationException("FFmpeg tools are unavailable.");
+        var inspector = new MediaInspector(activeToolchain);
+        return await new MediaUtilityService(activeToolchain, inspector).ExtractFrameAsync(
+            sourcePath, outputPath, TimeSpan.FromSeconds(atSeconds), cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private static Resolution ResolutionFor(ExportResolutionPreset preset, Resolution canvas)

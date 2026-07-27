@@ -17,10 +17,23 @@
   <system:String x:Key="Timeline">Línea de tiempo</system:String><system:String x:Key="Language">Idioma</system:String>
   <system:String x:Key="SystemLanguage">Sistema</system:String><system:String x:Key="English">English</system:String><system:String x:Key="Spanish">Español</system:String>
   <system:String x:Key="Ready">Listo</system:String><system:String x:Key="Working">Trabajando…</system:String>
+  <system:String x:Key="CompactQuality">Compacta</system:String><system:String x:Key="BalancedQuality">Equilibrada</system:String><system:String x:Key="HighQuality">Alta</system:String>
   <system:String x:Key="ExportTitle">Exportar vídeo</system:String><system:String x:Key="Resolution">Resolución</system:String>
   <system:String x:Key="Codec">Formato</system:String><system:String x:Key="Quality">Calidad</system:String><system:String x:Key="Cancel">Cancelar</system:String>
   <system:String x:Key="ProjectName">Nombre del proyecto</system:String><system:String x:Key="Create">Crear</system:String>
   <system:String x:Key="Canvas">Lienzo</system:String><system:String x:Key="FrameRate">Fotogramas por segundo</system:String>
   <system:String x:Key="ErrorTitle">Cineleaf no ha podido completar la acción</system:String>
   <system:String x:Key="AboutText">Edición de vídeo gratuita y privada. Todo permanece en este ordenador.</system:String>
+  <system:String x:Key="ProjectSettings">Ajustes del proyecto</system:String><system:String x:Key="InsertGap">Añadir pausa negra</system:String>
+  <system:String x:Key="GapExplanation">Desplaza todo lo situado después del cabezal para crear una pausa negra y silenciosa. Los clips que cruzan el cabezal se dividen de forma segura.</system:String>
+  <system:String x:Key="GapDuration">Duración de la pausa (segundos)</system:String><system:String x:Key="GapInvalid">Introduce una duración mayor que 0 y de hasta 24 horas.</system:String><system:String x:Key="Insert">Añadir</system:String>
+  <system:String x:Key="DetachAudio">Separar audio</system:String><system:String x:Key="ExtractAudio">Extraer audio original</system:String><system:String x:Key="SaveFrame">Guardar fotograma actual</system:String>
+  <system:String x:Key="AudioExtracted">Audio extraído y verificado.</system:String><system:String x:Key="FrameSaved">Fotograma PNG guardado y verificado.</system:String>
+  <system:String x:Key="ContentMode">Ajuste de imagen</system:String><system:String x:Key="Fit">Encajar</system:String><system:String x:Key="Fill">Rellenar</system:String><system:String x:Key="Crop">Recortar para rellenar</system:String>
+  <system:String x:Key="Enabled">Activado</system:String><system:String x:Key="Reverse">Reproducir al revés</system:String><system:String x:Key="HideVideo">Ocultar vídeo (mantener audio)</system:String>
+  <system:String x:Key="FadeIn">Fundido de entrada (segundos)</system:String><system:String x:Key="FadeOut">Fundido de salida (segundos)</system:String><system:String x:Key="CropEdges">Recorte de bordes (0 a 0,95)</system:String>
+  <system:String x:Key="CropTop">Superior</system:String><system:String x:Key="CropBottom">Inferior</system:String><system:String x:Key="CropLeft">Izquierdo</system:String><system:String x:Key="CropRight">Derecho</system:String>
+  <system:String x:Key="TransitionIn">Transición de entrada</system:String><system:String x:Key="TransitionOut">Transición de salida</system:String><system:String x:Key="None">Ninguna</system:String>
+  <system:String x:Key="CrossDissolve">Disolución</system:String><system:String x:Key="FadeBlack">Fundido a negro</system:String><system:String x:Key="Slide">Deslizamiento</system:String><system:String x:Key="Wipe">Barrido</system:String><system:String x:Key="Blur">Desenfoque</system:String>
+  <system:String x:Key="Sharpen">Nitidez</system:String><system:String x:Key="Vignette">Viñeta</system:String><system:String x:Key="Monochrome">Monocromo</system:String><system:String x:Key="Sepia">Sepia</system:String><system:String x:Key="Bloom">Resplandor</system:String>
 </ResourceDictionary>

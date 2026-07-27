@@ -63,7 +63,7 @@ jobs:
         run: |
           ./scripts/build_release.sh
           (cd dist && shasum -a 256 --check SHA256SUMS.txt)
-          hdiutil verify dist/Cineleaf-0.2.0-macOS.dmg
+          hdiutil verify dist/Cineleaf-0.3.0-macOS.dmg
           ARCHITECTURES="$(lipo -archs dist/Cineleaf.app/Contents/MacOS/Cineleaf)"
           [[ "$ARCHITECTURES" == *arm64* && "$ARCHITECTURES" == *x86_64* ]]
       - name: Smoke-test optional MCP setup

@@ -26,5 +26,7 @@ final class AutomationCLITests: XCTestCase {
         let data = try XCTUnwrap(object["data"] as? [String: Any])
         XCTAssertEqual(data["protocolVersion"] as? Int, 1)
         XCTAssertEqual(data["platform"] as? String, "macos")
+        XCTAssertTrue((data["commands"] as? [String])?.contains("extract-audio") == true)
+        XCTAssertTrue((data["commands"] as? [String])?.contains("extract-frame") == true)
     }
 }

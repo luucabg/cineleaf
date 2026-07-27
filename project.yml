@@ -31,6 +31,7 @@ targets:
       - path: Cineleaf/Services/MediaAccessManager.swift
       - path: Cineleaf/Services/MediaDerivativeStore.swift
       - path: Cineleaf/Services/MediaInspector.swift
+      - path: Cineleaf/Services/MediaUtilityService.swift
       - path: Cineleaf/Services/ReverseMediaService.swift
     settings:
       base:
@@ -50,7 +51,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.cineleaf.Cineleaf
         PRODUCT_NAME: Cineleaf
-        MARKETING_VERSION: 0.2.0
+        MARKETING_VERSION: 0.3.0
         CURRENT_PROJECT_VERSION: 1
         INFOPLIST_FILE: Cineleaf/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

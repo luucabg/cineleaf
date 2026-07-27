@@ -22,7 +22,7 @@ test("advertises focused AI tools and returns structured capability data", async
   try {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [
-      "cineleaf_capabilities", "cineleaf_create_video", "cineleaf_create_video_batch", "cineleaf_edit_project", "cineleaf_inspect_project"
+      "cineleaf_capabilities", "cineleaf_create_video", "cineleaf_create_video_batch", "cineleaf_edit_project", "cineleaf_extract_audio", "cineleaf_extract_frame", "cineleaf_inspect_project"
     ]);
     const result = await client.callTool({ name: "cineleaf_capabilities", arguments: {} });
     assert.equal(result.structuredContent.protocolVersion, 1);

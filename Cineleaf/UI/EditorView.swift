@@ -54,6 +54,11 @@ struct EditorView: View {
                         .frame(width: 70)
                         .help("media.consolidating")
                 }
+                if state.isExtractingMedia {
+                    ProgressView()
+                        .controlSize(.small)
+                        .help("media.extracting")
+                }
                 Button { state.isProjectSettingsPresented = true } label: {
                     Label("project.settings", systemImage: "slider.horizontal.3")
                 }

@@ -90,6 +90,33 @@ public sealed class RenderIntegrationTests : IAsyncLifetime
         ], cancellationToken: cancellation.Token));
     }
 
+    [Fact]
+    public async Task ExtractsAndVerifiesAudioAndAnExactFrame()
+    {
+        var source = Path.Combine(_root, "utility-source.mp4");
+        await MediaProcessRunner.RunAsync(_toolchain.FfmpegPath,
+        [
+            "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
+            "-c:v", "libopenh264", "-b:v", "600000", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", source
+        ]);
+        var inspector = new MediaInspector(_toolchain);
+        var service = new MediaUtilityService(_toolchain, inspector);
+        var audioPath = Path.Combine(_root, "extracted.m4a");
+        var framePath = Path.Combine(_root, "frame.png");
+
+        var audio = await service.ExtractAudioAsync(source, audioPath, TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1));
+        var frame = await service.ExtractFrameAsync(source, framePath, TimeSpan.FromSeconds(1));
+
+        Assert.True(audio.HasAudio);
+        Assert.InRange(audio.DurationSeconds, 0.9, 1.1);
+        Assert.Equal(320, frame.Width);
+        Assert.Equal(180, frame.Height);
+        Assert.True(File.Exists(audioPath));
+        Assert.True(File.Exists(framePath));
+    }
+
     public Task DisposeAsync()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);

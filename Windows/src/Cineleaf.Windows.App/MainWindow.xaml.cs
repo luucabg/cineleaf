@@ -68,6 +68,18 @@ public partial class MainWindow : Window, IDisposable
         VolumeBox.Text = Format(clip.AudioVolume);
         ScaleBox.Text = Format(clip.Transform.Scale);
         RotationBox.Text = Format(clip.Transform.RotationDegrees);
+        SelectTag(ContentModeBox, clip.Transform.ContentMode.ToString());
+        EnabledBox.IsChecked = clip.IsEnabled;
+        ReverseBox.IsChecked = clip.IsReversed;
+        HideVideoBox.IsChecked = clip.IsVideoMuted;
+        FadeInBox.Text = Format(Math.Max(clip.Fades.VideoIn.Seconds, clip.Fades.AudioIn.Seconds));
+        FadeOutBox.Text = Format(Math.Max(clip.Fades.VideoOut.Seconds, clip.Fades.AudioOut.Seconds));
+        CropTopBox.Text = Format(clip.Transform.CropTop);
+        CropBottomBox.Text = Format(clip.Transform.CropBottom);
+        CropLeftBox.Text = Format(clip.Transform.CropLeading);
+        CropRightBox.Text = Format(clip.Transform.CropTrailing);
+        SelectTag(TransitionInBox, clip.TransitionIn?.Kind.ToString() ?? "None");
+        SelectTag(TransitionOutBox, clip.TransitionOut?.Kind.ToString() ?? "None");
         TextContentBox.Text = clip.TextStyle?.Text ?? string.Empty;
         TextContentBox.IsEnabled = clip.TextStyle is not null;
     }
@@ -84,6 +96,13 @@ public partial class MainWindow : Window, IDisposable
     {
         var dialog = new NewProjectWindow { Owner = this };
         if (dialog.ShowDialog() == true) _viewModel.NewProject(dialog.ProjectName, dialog.Canvas, dialog.FrameRate);
+    }
+
+    private void ProjectSettings_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new NewProjectWindow(_viewModel.Project) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            RunEdit(() => _viewModel.UpdateProjectSettings(dialog.ProjectName, dialog.Canvas, dialog.FrameRate));
     }
 
     private async void Open_Click(object sender, RoutedEventArgs e)
@@ -133,8 +152,51 @@ public partial class MainWindow : Window, IDisposable
     private void Split_Click(object sender, RoutedEventArgs e) => RunEdit(_viewModel.SplitSelected);
     private void AddText_Click(object sender, RoutedEventArgs e) => RunEdit(() => _viewModel.AddText());
     private void Duplicate_Click(object sender, RoutedEventArgs e) => RunEdit(_viewModel.DuplicateSelected);
+    private void DetachAudio_Click(object sender, RoutedEventArgs e) => RunEdit(_viewModel.DetachSelectedAudio);
+    private void InsertGap_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new InsertGapWindow { Owner = this };
+        if (dialog.ShowDialog() == true) RunEdit(() => _viewModel.InsertGap(dialog.DurationSeconds));
+    }
     private void RippleDelete_Click(object sender, RoutedEventArgs e) => RunEdit(() => _viewModel.DeleteSelected(ripple: true));
     private void Marker_Click(object sender, RoutedEventArgs e) => RunEdit(_viewModel.AddMarker);
+
+    private async void ExtractAudio_Click(object sender, RoutedEventArgs e)
+    {
+        var clip = _viewModel.SelectedClip;
+        var dialog = new SaveFileDialog
+        {
+            Title = FindResource("ExtractAudio").ToString(),
+            Filter = "M4A audio (*.m4a)|*.m4a",
+            FileName = SanitizeName(clip?.Name ?? "audio") + ".m4a",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            await _viewModel.ExtractSelectedAudioAsync(dialog.FileName);
+            StatusText.Text = FindResource("AudioExtracted").ToString();
+        }
+        catch (Exception error) { ShowError(error); }
+    }
+
+    private async void SaveFrame_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = FindResource("SaveFrame").ToString(),
+            Filter = "PNG image (*.png)|*.png",
+            FileName = SanitizeName(_viewModel.SelectedClip?.Name ?? "frame") + ".png",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            await _viewModel.ExtractCurrentFrameAsync(dialog.FileName);
+            StatusText.Text = FindResource("FrameSaved").ToString();
+        }
+        catch (Exception error) { ShowError(error); }
+    }
 
     private async void FindBeats_Click(object sender, RoutedEventArgs e)
     {
@@ -218,7 +280,11 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             _viewModel.ApplySelectedClip(ClipNameBox.Text, Parse(StartBox), Parse(DurationBox), Parse(SpeedBox),
-                Parse(OpacityBox), Parse(VolumeBox), Parse(ScaleBox), Parse(RotationBox), TextContentBox.Text);
+                Parse(OpacityBox), Parse(VolumeBox), Parse(ScaleBox), Parse(RotationBox), TextContentBox.Text,
+                ParseEnum<ContentMode>(ContentModeBox), EnabledBox.IsChecked == true, ReverseBox.IsChecked == true,
+                HideVideoBox.IsChecked == true, Parse(FadeInBox), Parse(FadeOutBox), Parse(CropTopBox),
+                Parse(CropBottomBox), Parse(CropLeftBox), Parse(CropRightBox), ParseTransition(TransitionInBox),
+                ParseTransition(TransitionOutBox));
         }
         catch (Exception error) { ShowError(error); }
     }
@@ -288,6 +354,7 @@ public partial class MainWindow : Window, IDisposable
     {
         var control = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
         if (e.Key == Key.Space) { Play_Click(sender, e); e.Handled = true; }
         else if (control && e.Key == Key.N) { New_Click(sender, e); e.Handled = true; }
         else if (control && e.Key == Key.O) { Open_Click(sender, e); e.Handled = true; }
@@ -295,9 +362,13 @@ public partial class MainWindow : Window, IDisposable
         else if (control && e.Key == Key.I) { Import_Click(sender, e); e.Handled = true; }
         else if (control && e.Key == Key.E) { Export_Click(sender, e); e.Handled = true; }
         else if (control && e.Key == Key.B) { Split_Click(sender, e); e.Handled = true; }
+        else if (control && !alt && e.Key == Key.D) { Duplicate_Click(sender, e); e.Handled = true; }
+        else if (control && alt && e.Key == Key.G) { InsertGap_Click(sender, e); e.Handled = true; }
+        else if (control && alt && e.Key == Key.A) { DetachAudio_Click(sender, e); e.Handled = true; }
         else if (control && e.Key == Key.Z && !shift) { _viewModel.Undo(); e.Handled = true; }
         else if ((control && e.Key == Key.Y) || (control && shift && e.Key == Key.Z)) { _viewModel.Redo(); e.Handled = true; }
         else if (e.Key == Key.Delete) { RunEdit(() => _viewModel.DeleteSelected(ripple: false)); e.Handled = true; }
+        else if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.None) { _viewModel.AddMarker(); e.Handled = true; }
         else if (control && (e.Key == Key.Add || e.Key == Key.OemPlus)) { Timeline.Zoom(1.2); e.Handled = true; }
         else if (control && (e.Key == Key.Subtract || e.Key == Key.OemMinus)) { Timeline.Zoom(1 / 1.2); e.Handled = true; }
         else if (e.Key is Key.Left or Key.Right)
@@ -312,10 +383,10 @@ public partial class MainWindow : Window, IDisposable
 
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (_isClosingAfterSave || !_viewModel.IsDirty) { _viewModel.Dispose(); return; }
+        if (_isClosingAfterSave || !_viewModel.IsDirty) { Dispose(); return; }
         var result = MessageBox.Show(this, "Save this project before closing?", "Cineleaf", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (result == MessageBoxResult.Cancel) { e.Cancel = true; return; }
-        if (result == MessageBoxResult.No) { _viewModel.Dispose(); return; }
+        if (result == MessageBoxResult.No) { Dispose(); return; }
         e.Cancel = true;
         if (await SaveWithDialogAsync()) { _isClosingAfterSave = true; Close(); }
     }
@@ -328,6 +399,13 @@ public partial class MainWindow : Window, IDisposable
 
     private void ShowError(Exception error) => MessageBox.Show(this, error.Message, FindResource("ErrorTitle").ToString(), MessageBoxButton.OK, MessageBoxImage.Error);
     private static string Format(double number) => number.ToString("0.###", CultureInfo.CurrentCulture);
+    private static T ParseEnum<T>(ComboBox box) where T : struct, Enum =>
+        box.SelectedItem is ComboBoxItem { Tag: string value } && Enum.TryParse<T>(value, out var result) ? result : default;
+    private static TransitionKind? ParseTransition(ComboBox box) =>
+        box.SelectedItem is ComboBoxItem { Tag: string value } && !value.Equals("None", StringComparison.OrdinalIgnoreCase) &&
+        Enum.TryParse<TransitionKind>(value, out var result) ? result : null;
+    private static void SelectTag(ComboBox box, string value) => box.SelectedItem = box.Items.OfType<ComboBoxItem>()
+        .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), value, StringComparison.OrdinalIgnoreCase));
     private static double Parse(TextBox box) => double.TryParse(box.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var value)
         ? value : throw new FormatException($"“{box.Text}” is not a valid number.");
     private static string FormatTime(TimeSpan time) => time.ToString(time.TotalHours >= 1 ? @"h\:mm\:ss" : @"m\:ss", CultureInfo.CurrentCulture);
@@ -339,7 +417,7 @@ public partial class MainWindow : Window, IDisposable
         _disposed = true;
         _playbackTimer.Stop();
         _autosaveTimer.Stop();
-        Dispose();
+        _viewModel.Dispose();
         GC.SuppressFinalize(this);
     }
 }

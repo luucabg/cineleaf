@@ -34,3 +34,15 @@ test("reassembles progress messages split across native stderr chunks", async ()
 
   assert.deepEqual(progress, [0.5]);
 });
+
+test("passes extraction arguments as data without invoking a command shell", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-cli-derived-"));
+  const fake = path.join(root, "fake-derived.mjs");
+  const calls = path.join(root, "arguments.json");
+  await writeFile(fake, `import{writeFileSync}from'node:fs';writeFileSync(${JSON.stringify(calls)},JSON.stringify(process.argv.slice(2)));process.stdout.write(JSON.stringify({ok:true,data:{path:process.argv[3]}})+'\\n')`, "utf8");
+  const adapter = new NativeCliAdapter({ executable: process.execPath, prefixArguments: [fake] });
+
+  await adapter.extractAudio("source clip.mp4", "audio file.m4a", { startSeconds: 2, durationSeconds: 3 });
+
+  assert.deepEqual(JSON.parse(await readFile(calls, "utf8")), ["extract-audio", "source clip.mp4", "audio file.m4a", "2", "3"]);
+});

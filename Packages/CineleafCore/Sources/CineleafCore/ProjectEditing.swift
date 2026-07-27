@@ -230,8 +230,16 @@ public struct ProjectEditor: Sendable {
         let track = draft.timeline.tracks[location.track]
         guard !track.isLocked else { throw EditingError.trackLocked(track.id) }
         var duplicate = track.clips[location.clip]
+        let originalID = duplicate.id
         duplicate.id = UUID()
-        duplicate.timelineStart = start ?? duplicate.timelineEnd
+        duplicate.timelineStart = start ?? Self.firstAvailableStart(
+            in: track.clips,
+            after: duplicate.timelineEnd,
+            duration: duplicate.duration,
+            excluding: originalID
+        )
+        duplicate.groupID = nil
+        duplicate.linkGroupID = nil
         draft.timeline.tracks[location.track].clips.append(duplicate)
         draft.timeline.tracks[location.track].clips.sort { $0.timelineStart < $1.timelineStart }
         try commit(draft)
@@ -245,18 +253,27 @@ public struct ProjectEditor: Sendable {
         let sourceTrack = draft.timeline.tracks[location.track]
         guard !sourceTrack.isLocked else { throw EditingError.trackLocked(sourceTrack.id) }
         var source = sourceTrack.clips[location.clip]
-        guard source.kind == .video, source.assetID != nil else { throw EditingError.invalidEdit }
+        guard source.kind == .video,
+              let assetID = source.assetID,
+              draft.assets.first(where: { $0.id == assetID })?.metadata.hasAudio == true else {
+            throw EditingError.invalidEdit
+        }
 
         let destinationIndex: Int
         if let audioTrackID {
             destinationIndex = try editableTrackIndex(audioTrackID, in: draft)
-        } else if let existing = draft.timeline.tracks.firstIndex(where: { $0.kind == .audio && !$0.isLocked }) {
+        } else if let existing = draft.timeline.tracks.firstIndex(where: { track in
+            track.kind == .audio && !track.isLocked && track.clips.allSatisfy { !$0.timeRange.intersects(source.timeRange) }
+        }) {
             destinationIndex = existing
         } else {
             draft.timeline.tracks.append(TimelineTrack(name: "A\(draft.timeline.tracks.filter { $0.kind == .audio }.count + 1)", kind: .audio))
             destinationIndex = draft.timeline.tracks.count - 1
         }
         guard draft.timeline.tracks[destinationIndex].kind == .audio else { throw EditingError.invalidEdit }
+        guard draft.timeline.tracks[destinationIndex].clips.allSatisfy({ !$0.timeRange.intersects(source.timeRange) }) else {
+            throw EditingError.invalidEdit
+        }
 
         var audio = source
         audio.id = UUID()
@@ -264,6 +281,8 @@ public struct ProjectEditor: Sendable {
         audio.isVideoMuted = true
         audio.transform = ClipTransform()
         audio.opacity = 1
+        audio.groupID = nil
+        audio.linkGroupID = nil
         source.audioVolume = 0
         draft.timeline.tracks[location.track].clips[location.clip] = source
         draft.timeline.tracks[destinationIndex].clips.append(audio)
@@ -334,6 +353,21 @@ public struct ProjectEditor: Sendable {
 
     static func scaled(_ time: RationalTime, by factor: Double) -> RationalTime {
         RationalTime(seconds: time.seconds * factor, preferredTimescale: 60_000)
+    }
+
+    private static func firstAvailableStart(
+        in clips: [TimelineClip],
+        after start: RationalTime,
+        duration: RationalTime,
+        excluding clipID: UUID
+    ) -> RationalTime {
+        var candidate = start
+        for clip in clips.filter({ $0.id != clipID }).sorted(by: { $0.timelineStart < $1.timelineStart }) {
+            if clip.timelineEnd <= candidate { continue }
+            if candidate + duration <= clip.timelineStart { return candidate }
+            candidate = clip.timelineEnd
+        }
+        return candidate
     }
 }
 

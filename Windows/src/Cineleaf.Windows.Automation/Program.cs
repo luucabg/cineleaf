@@ -21,7 +21,9 @@ try
         "inspect-media" when args.Length == 2 => await service.InspectMediaAsync(args[1], cancellation.Token),
         "validate-project" when args.Length == 2 => await AutomationBridgeService.ValidateProjectAsync(args[1], cancellation.Token),
         "render-project" when args.Length == 6 => await Render(service, args, cancellation.Token),
-        _ => throw new ArgumentException("Usage: capabilities | inspect-media <path> | validate-project <project.cineleaf> | render-project <project.cineleaf> <output> <p720|p1080|p1440|p2160> <h264|hevc> <compact|balanced|high>")
+        "extract-audio" when args.Length == 5 => await service.ExtractAudioAsync(args[1], args[2], ParseSeconds(args[3]), ParseOptionalSeconds(args[4]), cancellation.Token),
+        "extract-frame" when args.Length == 4 => await service.ExtractFrameAsync(args[1], args[2], ParseSeconds(args[3]), cancellation.Token),
+        _ => throw new ArgumentException("Usage: capabilities | inspect-media <path> | validate-project <project.cineleaf> | render-project <project.cineleaf> <output> <p720|p1080|p1440|p2160> <h264|hevc> <compact|balanced|high> | extract-audio <source> <output.m4a> <start-seconds> <duration-seconds|all> | extract-frame <source> <output.png> <at-seconds>")
     };
     Console.Out.WriteLine(JsonSerializer.Serialize(new { ok = true, data }, json));
     return 0;
@@ -48,6 +50,13 @@ static async Task<RenderResult> Render(AutomationBridgeService service, string[]
 
 static T Parse<T>(string value) where T : struct, Enum =>
     Enum.TryParse<T>(value, ignoreCase: true, out var parsed) ? parsed : throw new ArgumentException($"Unsupported {typeof(T).Name}: {value}.");
+
+static double ParseSeconds(string value) => double.TryParse(value, System.Globalization.NumberStyles.Float,
+    System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed >= 0
+    ? parsed : throw new ArgumentException($"Invalid time value: {value}.");
+
+static double? ParseOptionalSeconds(string value) => value.Equals("all", StringComparison.OrdinalIgnoreCase)
+    ? null : ParseSeconds(value) is var parsed && parsed > 0 ? parsed : throw new ArgumentException($"Invalid duration: {value}.");
 
 static FfmpegToolchain FindToolchain()
 {

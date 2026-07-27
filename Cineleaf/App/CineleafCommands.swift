@@ -70,6 +70,19 @@ struct CineleafCommands: Commands {
             Button("timeline.duplicate") { state.duplicateSelection() }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(state.selectedClipIDs.count != 1)
+            Button("timeline.insert_gap") { insertGapPanel() }
+                .keyboardShortcut("g", modifiers: [.command, .option])
+                .disabled(state.project == nil)
+            Button("audio.detach") { state.detachAudio() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+                .disabled(state.selectedClip?.kind != .video)
+            Button("audio.extract_file") { extractAudioPanel() }
+                .disabled(state.selectedClip == nil || state.isExtractingMedia)
+            Button("frame.save_current") { saveFramePanel() }
+                .disabled(
+                    !(state.selectedClip?.kind == .video || state.selectedClip?.kind == .image)
+                        || state.isExtractingMedia
+                )
             Button("clip.properties.copy") { state.copySelectedClipProperties() }
                 .keyboardShortcut("c", modifiers: [.command, .option])
                 .disabled(state.selectedClipIDs.count != 1)
@@ -146,5 +159,48 @@ struct CineleafCommands: Commands {
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK else { return }
         Task { await state.importMedia(panel.urls) }
+    }
+
+    private func insertGapPanel() {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "timeline.insert_gap")
+        alert.informativeText = String(localized: "timeline.insert_gap.help")
+        alert.addButton(withTitle: String(localized: "action.insert"))
+        alert.addButton(withTitle: String(localized: "action.cancel"))
+        let field = NSTextField(string: "1")
+        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        field.placeholderString = String(localized: "timeline.gap.duration")
+        alert.accessoryView = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let formatter = NumberFormatter()
+        formatter.locale = .current
+        guard let duration = formatter.number(from: field.stringValue)?.doubleValue,
+              duration.isFinite,
+              duration > 0,
+              duration <= 86_400 else {
+            let invalid = NSAlert()
+            invalid.messageText = String(localized: "error.gap.invalid")
+            invalid.runModal()
+            return
+        }
+        state.insertGap(durationSeconds: duration)
+    }
+
+    private func extractAudioPanel() {
+        let panel = NSSavePanel()
+        panel.title = String(localized: "audio.extract_file")
+        panel.allowedContentTypes = [UTType(filenameExtension: "m4a") ?? .audio]
+        panel.nameFieldStringValue = (state.selectedClip?.name ?? "audio") + ".m4a"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        Task { await state.extractSelectedAudio(to: destination) }
+    }
+
+    private func saveFramePanel() {
+        let panel = NSSavePanel()
+        panel.title = String(localized: "frame.save_current")
+        panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = (state.selectedClip?.name ?? "frame") + ".png"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        Task { await state.saveCurrentFrame(to: destination) }
     }
 }

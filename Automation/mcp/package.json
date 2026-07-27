@@ -1,6 +1,6 @@
 {
   "name": "@cineleaf/mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Local MCP automation server for Cineleaf on Windows and macOS",

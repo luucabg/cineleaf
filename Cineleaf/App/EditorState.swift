@@ -51,6 +51,7 @@ final class EditorState: ObservableObject {
     @Published private(set) var isDetectingSilence = false
     @Published private(set) var isDetectingBeats = false
     @Published private(set) var isCreatingFreezeFrame = false
+    @Published private(set) var isExtractingMedia = false
     @Published private(set) var consolidationProgress: Double?
     @Published private(set) var canPasteClipProperties = false
     @Published var pendingSilenceRemoval: SilenceRemovalProposal?
@@ -83,6 +84,7 @@ final class EditorState: ObservableObject {
     private let silenceDetection = SilenceDetectionService()
     private let beatDetection = BeatDetectionService()
     private let freezeFrameService = FreezeFrameService()
+    private let mediaUtilityService = MediaUtilityService()
     private let mediaConsolidator = ProjectMediaConsolidator()
     private var voiceoverStart = RationalTime.zero
     private var autosaveTask: Task<Void, Never>?
@@ -443,6 +445,96 @@ final class EditorState: ObservableObject {
         if let detached { selectedClipIDs = [detached] }
     }
 
+    func insertGap(durationSeconds: Double) {
+        guard durationSeconds.isFinite, durationSeconds > 0, durationSeconds <= 86_400 else {
+            present(EditingError.invalidEdit, messageKey: "error.gap.invalid")
+            return
+        }
+        let duration = RationalTime(seconds: durationSeconds, preferredTimescale: 60_000)
+        performEdit { try $0.insertGap(at: playback.currentTime, duration: duration) }
+    }
+
+    func extractSelectedAudio(to destination: URL) async {
+        guard let project,
+              let clip = selectedClip,
+              let assetID = clip.assetID,
+              let asset = project.assets.first(where: { $0.id == assetID }),
+              asset.metadata.hasAudio else {
+            present(EditingError.invalidEdit, messageKey: "error.audio.extract")
+            return
+        }
+        isExtractingMedia = true
+        defer { isExtractingMedia = false }
+        do {
+            let source = try await accessManager.resolve(asset.reference)
+            let sourceDuration = RationalTime(
+                seconds: clip.duration.seconds * clip.playbackRate,
+                preferredTimescale: 60_000
+            )
+            _ = try await mediaUtilityService.extractAudio(
+                from: source,
+                to: destination,
+                start: clip.sourceStart,
+                duration: sourceDuration,
+                overwrite: true
+            )
+        } catch {
+            present(error, messageKey: "error.audio.extract")
+        }
+    }
+
+    func saveCurrentFrame(to destination: URL) async {
+        guard let project,
+              let clip = selectedClip,
+              clip.kind == .video || clip.kind == .image,
+              let assetID = clip.assetID,
+              let asset = project.assets.first(where: { $0.id == assetID }) else {
+            present(EditingError.invalidEdit, messageKey: "error.frame.extract")
+            return
+        }
+        isExtractingMedia = true
+        defer { isExtractingMedia = false }
+        do {
+            let source = try await accessManager.resolve(asset.reference)
+            let localTime = (playback.currentTime - clip.timelineStart).clamped(to: .zero...clip.duration)
+            let sourceDuration = RationalTime(
+                seconds: clip.duration.seconds * clip.playbackRate,
+                preferredTimescale: 60_000
+            )
+            var sourceOffset: RationalTime
+            if clip.kind == .image {
+                sourceOffset = .zero
+            } else if clip.isReversed {
+                sourceOffset = max(
+                    sourceDuration - RationalTime(
+                        seconds: localTime.seconds * clip.playbackRate,
+                        preferredTimescale: 60_000
+                    ) - project.frameRate.value.frameDuration,
+                    .zero
+                )
+            } else {
+                sourceOffset = RationalTime(
+                    seconds: localTime.seconds * clip.playbackRate,
+                    preferredTimescale: 60_000
+                )
+            }
+            if clip.kind == .video {
+                sourceOffset = min(
+                    sourceOffset,
+                    max(sourceDuration - project.frameRate.value.frameDuration, .zero)
+                )
+            }
+            _ = try await mediaUtilityService.extractFrame(
+                from: source,
+                to: destination,
+                at: clip.sourceStart + sourceOffset,
+                overwrite: true
+            )
+        } catch {
+            present(error, messageKey: "error.frame.extract")
+        }
+    }
+
     func setPlaybackRate(_ rate: Double, for clipID: UUID) {
         performEdit { try $0.setPlaybackRate(clipID, rate: rate, ripple: true) }
     }
@@ -640,7 +732,7 @@ final class EditorState: ObservableObject {
                 seconds: clip.duration.seconds * clip.playbackRate,
                 preferredTimescale: 60_000
             )
-            let sourceOffset: RationalTime
+            var sourceOffset: RationalTime
             if clip.isReversed {
                 let oneFrame = project.frameRate.value.frameDuration
                 sourceOffset = max(
@@ -656,6 +748,10 @@ final class EditorState: ObservableObject {
                     preferredTimescale: 60_000
                 )
             }
+            sourceOffset = min(
+                sourceOffset,
+                max(sourceDuration - project.frameRate.value.frameDuration, .zero)
+            )
             let imageURL = try await freezeFrameService.create(
                 url: sourceURL,
                 sourceTime: (clip.sourceStart + sourceOffset).cmTime

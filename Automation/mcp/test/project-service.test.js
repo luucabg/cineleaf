@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -7,7 +7,7 @@ import test from "node:test";
 import { AutomationError, ProjectService } from "../src/project-service.js";
 
 class FakeAdapter {
-  constructor() { this.renderCalls = []; }
+  constructor() { this.renderCalls = []; this.audioCalls = []; this.frameCalls = []; }
   async inspectMedia(mediaPath) {
     return mediaPath.endsWith(".mp3")
       ? { kind: "audio", durationSeconds: 30, hasAudio: true, fileType: "mp3", fileSize: 100 }
@@ -17,6 +17,16 @@ class FakeAdapter {
   async renderProject(projectPath, outputPath, options) {
     this.renderCalls.push({ projectPath, outputPath, options });
     return { path: outputPath, durationSeconds: 10, width: 1920, height: 1080, encoder: "test" };
+  }
+  async extractAudio(inputPath, outputPath, options) {
+    this.audioCalls.push({ inputPath, outputPath, options });
+    await writeFile(outputPath, "audio", "utf8");
+    return { path: outputPath, durationSeconds: options.durationSeconds ?? 60, hasAudio: true };
+  }
+  async extractFrame(inputPath, outputPath, options) {
+    this.frameCalls.push({ inputPath, outputPath, options });
+    await writeFile(outputPath, "png", "utf8");
+    return { path: outputPath, width: 1920, height: 1080 };
   }
 }
 
@@ -223,4 +233,61 @@ test("inspects repeated media only once per video plan", async () => {
     dryRun: true
   });
   assert.equal(calls, 1);
+});
+
+test("previews and atomically writes extracted audio and frames inside allowed roots", async () => {
+  const { root, adapter, service } = await setup();
+  const source = path.join(root, "source.mp4");
+  const audio = path.join(root, "source-audio.m4a");
+  const frame = path.join(root, "frame.png");
+  await writeFile(source, "media", "utf8");
+
+  const audioPlan = await service.extractAudio({ sourcePath: source, outputPath: audio, startSeconds: 2, durationSeconds: 3, dryRun: true });
+  assert.equal(audioPlan.written, false);
+  assert.equal(adapter.audioCalls.length, 0);
+  await service.extractAudio({ sourcePath: source, outputPath: audio, startSeconds: 2, durationSeconds: 3, dryRun: false, confirmWrite: true });
+  await service.extractFrame({ sourcePath: source, outputPath: frame, atSeconds: 1, dryRun: false, confirmWrite: true });
+
+  assert.equal(await readFile(audio, "utf8"), "audio");
+  assert.equal(await readFile(frame, "utf8"), "png");
+  assert.equal(adapter.audioCalls[0].options.startSeconds, 2);
+  assert.equal(adapter.frameCalls[0].options.atSeconds, 1);
+});
+
+test("derived media never replaces a source or existing output without explicit overwrite", async () => {
+  const { root, service } = await setup();
+  const source = path.join(root, "source.m4a");
+  const output = path.join(root, "existing.m4a");
+  await writeFile(source, "source", "utf8");
+  await writeFile(output, "keep", "utf8");
+
+  await assert.rejects(
+    service.extractAudio({ sourcePath: source, outputPath: source, dryRun: false, confirmWrite: true }),
+    error => error.code === "output_conflicts_with_source"
+  );
+  await assert.rejects(
+    service.extractAudio({ sourcePath: source, outputPath: output, dryRun: false, confirmWrite: true }),
+    error => error.code === "output_exists"
+  );
+  assert.equal(await readFile(output, "utf8"), "keep");
+});
+
+test("a failed verified overwrite preserves the previous derived output and cleans temporary files", async () => {
+  const { root, adapter, service } = await setup();
+  const source = path.join(root, "source.m4a");
+  const output = path.join(root, "existing.m4a");
+  await writeFile(source, "source", "utf8");
+  await writeFile(output, "previous", "utf8");
+  adapter.extractAudio = async (_source, temporary) => {
+    await writeFile(temporary, "incomplete", "utf8");
+    throw new Error("verification failed");
+  };
+
+  await assert.rejects(
+    service.extractAudio({ sourcePath: source, outputPath: output, dryRun: false, confirmWrite: true, overwrite: true }),
+    /verification failed/
+  );
+
+  assert.equal(await readFile(output, "utf8"), "previous");
+  assert.deepEqual((await readdir(root)).sort(), ["existing.m4a", "source.m4a"]);
 });

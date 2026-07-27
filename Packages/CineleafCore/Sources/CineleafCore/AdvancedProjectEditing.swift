@@ -21,6 +21,42 @@ public struct ClipPropertyBundle: Codable, Hashable, Sendable {
 }
 
 public extension ProjectEditor {
+    mutating func insertGap(at time: RationalTime, duration: RationalTime) throws {
+        guard time >= .zero, time < project.timeline.duration, duration > .zero else {
+            throw EditingError.invalidEdit
+        }
+        var draft = project
+        for trackIndex in draft.timeline.tracks.indices {
+            let track = draft.timeline.tracks[trackIndex]
+            let affected = track.clips.contains { $0.timelineEnd > time }
+            if affected && track.isLocked { throw EditingError.trackLocked(track.id) }
+            var edited: [TimelineClip] = []
+            for clip in track.clips {
+                if clip.timelineStart >= time {
+                    var shifted = clip
+                    shifted.timelineStart = shifted.timelineStart + duration
+                    edited.append(shifted)
+                } else if clip.timelineEnd > time {
+                    let leftDuration = time - clip.timelineStart
+                    let rightDuration = clip.timelineEnd - time
+                    edited.append(Self.segment(of: clip, offset: .zero, duration: leftDuration, preserveID: true))
+                    var right = Self.segment(of: clip, offset: leftDuration, duration: rightDuration, preserveID: false)
+                    right.timelineStart = time + duration
+                    edited.append(right)
+                } else {
+                    edited.append(clip)
+                }
+            }
+            draft.timeline.tracks[trackIndex].clips = edited.sorted { $0.timelineStart < $1.timelineStart }
+        }
+        draft.timeline.markers = draft.timeline.markers.map { marker in
+            var shifted = marker
+            if shifted.time >= time { shifted.time = shifted.time + duration }
+            return shifted
+        }.sorted { $0.time < $1.time }
+        try commit(draft)
+    }
+
     mutating func insertEdit(_ clip: TimelineClip, into trackID: UUID, at time: RationalTime) throws {
         guard time >= .zero else { throw EditingError.invalidEdit }
         var draft = project

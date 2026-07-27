@@ -34,6 +34,21 @@ These are in-memory engine microbenchmarks captured by `Windows/tools/Cineleaf.W
 
 The media adapter is deterministic in this benchmark and each video's repeated source is inspected once. It includes writing and deleting each temporary project JSON used by a dry run, but deliberately excludes native validation, real media probing, decode and export. It therefore measures automation and temporary-package overhead rather than encoding speed. Reproduce it with `npm run benchmark --prefix Automation/mcp`.
 
+## Final editor-utility regression pass
+
+The feature-complete utility pass was measured on the same Windows workstation, with the same workloads, after adding gap/range edits, project settings, audio detachment, verified audio extraction and verified frame capture.
+
+| Repeatable case | Minimum | Median | Maximum |
+| --- | ---: | ---: | ---: |
+| Project validation | 0.3187 ms | 0.3286 ms | 0.4315 ms |
+| Project JSON serialization | 1.5530 ms | 1.6325 ms | 2.8025 ms |
+| Project JSON encode + decode | 7.5683 ms | 11.1052 ms | 15.9930 ms |
+| Move command with safe clone, validation and undo | 6.3727 ms | 11.8451 ms | 21.2536 ms |
+| Visible-range lookup in 10,000 clips | 0.0039 ms | 0.0040 ms | 0.0048 ms |
+| MCP 32-video planning workload | 85.640 ms | 98.653 ms | 115.886 ms |
+
+Against the recorded 0.2 automation baseline, the MCP minimum changed by about 1.3% and its median by about 5.6% in a very short benchmark. This is treated as timing noise to watch, not proof of a regression or improvement. A deliberately invalid parallel run was slower because both benchmarks competed for CPU and disk; the table contains the later isolated runs. No new operation is on the preview frame loop: extraction runs asynchronously and editing still uses the existing bounded validation and undo paths.
+
 ## Recorded automated baseline
 
 - Measurement revision: `6c4e455`
@@ -72,6 +87,7 @@ The table uses the unrounded samples printed in the XCTest log. Timing noise is 
 - Project validation fast-paths default transforms, fades, color, effects, and keyframes to avoid unnecessary temporary allocations.
 - AI requests deduplicate repeated media paths per plan; the native adapter also keeps a bounded 512-entry metadata cache invalidated by file size and modification time.
 - Batch output order is stable while work uses bounded concurrency. The default of two avoids starting enough simultaneous encoders to starve typical GPUs and storage.
+- Audio extraction and frame capture run outside the UI thread, support cancellation, stream through AVFoundation or FFmpeg, and only promote a small verified temporary result. They never load an entire source movie into memory.
 
 ## Engineering budgets
 

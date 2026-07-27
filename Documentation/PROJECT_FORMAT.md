@@ -26,6 +26,8 @@ The UTF-8, sorted-key JSON records:
 
 User-named export presets are application preferences rather than project data.
 
+A pause in black is represented as an intentional empty interval on the timeline; it does not add a synthetic media asset or change the format. Inserting one shifts later clips and markers and, when necessary, splits a clip while preserving its exact source-time mapping. Detached audio is a normal independent audio clip, so projects created with these tools remain valid version-2 projects on Mac and Windows.
+
 ## Save, autosave, and recovery
 
 Before a save, the complete project is validated and encoded. `project.json` is written with Foundation’s atomic write option so an interrupted write does not intentionally replace the last good file with partial JSON.

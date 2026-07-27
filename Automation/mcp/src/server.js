@@ -2,15 +2,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { AutomationError, ProjectService } from "./project-service.js";
-import { batchSchema, createVideoSchema, editProjectSchema } from "./schemas.js";
+import { batchSchema, createVideoSchema, editProjectSchema, extractAudioSchema, extractFrameSchema } from "./schemas.js";
 
 const protocolVersion = 1;
 
 export function createMcpServer({ roots, adapter }) {
   const service = new ProjectService({ roots, adapter });
   const server = new McpServer(
-    { name: "cineleaf", version: "0.2.0" },
-    { instructions: "Cineleaf edits video locally. Start with cineleaf_capabilities. For every write, call the same tool with dryRun=true first, show the plan to the user, then retry with dryRun=false, confirmWrite=true, and a unique idempotencyKey. Never invent paths or clip IDs: inspect the project first. Batch concurrency above 2 can reduce throughput on typical GPUs." }
+    { name: "cineleaf", version: "0.3.0" },
+    { instructions: "Cineleaf edits video locally. Start with cineleaf_capabilities. For every write, call the same tool with dryRun=true first, show the plan to the user, then retry with dryRun=false and confirmWrite=true. Project creation, editing and export also require a unique idempotencyKey. Never invent paths or clip IDs: inspect the project first. Batch concurrency above 2 can reduce throughput on typical GPUs." }
   );
 
   server.registerTool("cineleaf_capabilities", {
@@ -47,16 +47,30 @@ export function createMcpServer({ roots, adapter }) {
 
   server.registerTool("cineleaf_edit_project", {
     title: "Apply exact edits to a Cineleaf project",
-    description: "Moves, trims, transforms, updates, splits or deletes clips by stable ID; adds markers and text/subtitle clips. Defaults to dry-run and validates the final project with the native engine before reporting success.",
+    description: "Moves, trims, transforms, fades, updates, splits, duplicates, detaches audio or deletes clips by stable ID; changes project resolution, inserts black pauses, removes time ranges, and adds markers or text/subtitle clips. Defaults to dry-run and validates the final project with the native engine before reporting success.",
     inputSchema: editProjectSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true }
   }, args => handle(() => service.editProject(args)));
+
+  server.registerTool("cineleaf_extract_audio", {
+    title: "Extract audio from local media",
+    description: "Safely extracts all or part of a local video/audio source to a 48 kHz M4A file. Defaults to dry-run, never replaces the source, and refuses existing outputs unless overwrite is explicitly confirmed.",
+    inputSchema: extractAudioSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+  }, (args, extra) => handle(() => service.extractAudio(args, toolContext(extra))));
+
+  server.registerTool("cineleaf_extract_frame", {
+    title: "Save an exact video frame",
+    description: "Safely saves a frame from local video or image media as PNG at an exact time. Defaults to dry-run and never replaces the source.",
+    inputSchema: extractFrameSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+  }, (args, extra) => handle(() => service.extractFrame(args, toolContext(extra))));
 
   server.registerResource("cineleaf-automation-contract", "cineleaf://automation/contract", {
     title: "Cineleaf AI automation contract",
     description: "Machine-readable usage rules for safe, local video automation.",
     mimeType: "application/json"
-  }, async uri => ({ contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ protocolVersion, timeUnit: "seconds at the MCP boundary; exact rational time inside projects", projectFormatVersion: 2, destructiveWorkflow: ["dryRun", "user review", "confirmWrite", "idempotencyKey"], limits: { batch: 32, concurrency: 4, clipsPerVideo: 500 } }, null, 2) }] }));
+  }, async uri => ({ contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ protocolVersion, timeUnit: "seconds at the MCP boundary; exact rational time inside projects", projectFormatVersion: 2, destructiveWorkflow: ["dryRun", "user review", "confirmWrite", "idempotencyKey for project writes"], mediaOutputs: { audio: "m4a", frame: "png" }, limits: { batch: 32, concurrency: 4, clipsPerVideo: 500 } }, null, 2) }] }));
 
   server.registerPrompt("cineleaf-batch-workflow", {
     title: "Plan a reliable Cineleaf video batch",

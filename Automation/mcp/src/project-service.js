@@ -4,7 +4,7 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { batchSchema, createVideoSchema, editProjectSchema } from "./schemas.js";
+import { batchSchema, createVideoSchema, editProjectSchema, extractAudioSchema, extractFrameSchema } from "./schemas.js";
 
 const APPLE_EPOCH_SECONDS = 978307200;
 const canvasSizes = {
@@ -132,6 +132,47 @@ export class ProjectService {
     return this.#withProjectLock(projectPath, () => this.#editProjectLocked(request, dryRun, projectPath));
   }
 
+  async extractAudio(rawRequest, context = {}) {
+    const request = this.#parse(extractAudioSchema, rawRequest);
+    const dryRun = rawRequest.dryRun ?? !request.confirmWrite;
+    const sourcePath = this.#allowed(request.sourcePath, "sourcePath");
+    const outputPath = this.#allowed(request.outputPath, "outputPath");
+    if (path.extname(outputPath).toLowerCase() !== ".m4a")
+      throw new AutomationError("invalid_output_path", "Extracted audio must use the .m4a extension.");
+    this.#validateDerivedWrite(request, dryRun, sourcePath, outputPath);
+    const inspection = await this.adapter.inspectMedia(sourcePath, context.signal);
+    if (!inspection.hasAudio) throw new AutomationError("media_has_no_audio", "The source media does not contain an audio track.");
+    validateSourceRange(inspection, request.startSeconds, request.durationSeconds);
+    const plan = { operation: "extract_audio", sourcePath, outputPath, startSeconds: request.startSeconds, durationSeconds: request.durationSeconds, format: "m4a" };
+    if (dryRun) return { written: false, ...plan };
+    return this.#withProjectLock(outputPath, () => this.#writeDerivedOutput(
+      outputPath, request.overwrite,
+      temporary => this.adapter.extractAudio(sourcePath, temporary, request, context.signal),
+      plan
+    ));
+  }
+
+  async extractFrame(rawRequest, context = {}) {
+    const request = this.#parse(extractFrameSchema, rawRequest);
+    const dryRun = rawRequest.dryRun ?? !request.confirmWrite;
+    const sourcePath = this.#allowed(request.sourcePath, "sourcePath");
+    const outputPath = this.#allowed(request.outputPath, "outputPath");
+    if (path.extname(outputPath).toLowerCase() !== ".png")
+      throw new AutomationError("invalid_output_path", "Extracted frames must use the .png extension.");
+    this.#validateDerivedWrite(request, dryRun, sourcePath, outputPath);
+    const inspection = await this.adapter.inspectMedia(sourcePath, context.signal);
+    if (inspection.kind === "audio") throw new AutomationError("media_has_no_video", "The source media does not contain a video frame.");
+    if (inspection.durationSeconds != null && request.atSeconds >= inspection.durationSeconds)
+      throw new AutomationError("source_range_invalid", "The requested frame is outside the source media.");
+    const plan = { operation: "extract_frame", sourcePath, outputPath, atSeconds: request.atSeconds, format: "png" };
+    if (dryRun) return { written: false, ...plan };
+    return this.#withProjectLock(outputPath, () => this.#writeDerivedOutput(
+      outputPath, request.overwrite,
+      temporary => this.adapter.extractFrame(sourcePath, temporary, request, context.signal),
+      plan
+    ));
+  }
+
   async #editProjectLocked(request, dryRun, projectPath) {
     const requestHash = hashRequest({ ...request, dryRun: false, confirmWrite: true });
     if (!dryRun) {
@@ -157,6 +198,13 @@ export class ProjectService {
     const parsed = schema.safeParse(value);
     if (!parsed.success) throw new AutomationError("validation_error", "The automation request is invalid.", parsed.error.issues);
     return parsed.data;
+  }
+
+  #validateDerivedWrite(request, dryRun, sourcePath, outputPath) {
+    if (samePath(sourcePath, outputPath))
+      throw new AutomationError("output_conflicts_with_source", "outputPath cannot replace the source media file.");
+    if (!dryRun && !request.confirmWrite)
+      throw new AutomationError("confirmation_required", "Set confirmWrite=true after reviewing a dry run.");
   }
 
   #allowed(value, field) {
@@ -276,6 +324,29 @@ export class ProjectService {
     await rename(temporary, destination);
   }
 
+  async #writeDerivedOutput(outputPath, overwrite, action, plan) {
+    if (await exists(outputPath) && !overwrite)
+      throw new AutomationError("output_exists", "The output file already exists. Use overwrite=true only after confirming replacement.");
+    const parent = path.dirname(outputPath);
+    await mkdir(parent, { recursive: true });
+    const extension = path.extname(outputPath);
+    const temporary = path.join(parent, `.${path.basename(outputPath, extension)}.tmp-${randomUUID()}${extension}`);
+    const backup = `${outputPath}.backup-${randomUUID()}`;
+    let backedUp = false;
+    try {
+      const nativeResult = await action(temporary);
+      if (!await exists(temporary)) throw new AutomationError("output_missing", "The native media engine did not create the requested output.");
+      if (overwrite && await exists(outputPath)) { await rename(outputPath, backup); backedUp = true; }
+      await rename(temporary, outputPath);
+      if (backedUp) await rm(backup, { force: true }).catch(() => {});
+      return { written: true, ...plan, result: { ...nativeResult, path: outputPath } };
+    } catch (error) {
+      await rm(temporary, { force: true });
+      if (backedUp && !await exists(outputPath)) await rename(backup, outputPath);
+      throw error;
+    }
+  }
+
   async #validateDraft(projectPath, project) {
     const requestedParent = path.dirname(projectPath);
     const parent = await exists(requestedParent) ? requestedParent : tmpdir();
@@ -380,7 +451,30 @@ async function mapLimit(items, concurrency, action) {
 
 function applyOperation(project, operation) {
   const all = () => project.timeline.tracks.flatMap(track => track.clips.map(clip => ({ track, clip })));
-  if (operation.type === "add_marker") { project.timeline.markers.push({ id: randomUUID(), time: rational(operation.atSeconds), name: operation.name, colorHex: "#F7C948FF" }); return; }
+  if (operation.type === "update_project_settings") {
+    if ([operation.name, operation.canvasPreset, operation.frameRate, operation.exportResolution, operation.exportCodec, operation.exportQuality].every(value => value == null))
+      throw new AutomationError("empty_edit", "update_project_settings needs at least one setting to change.");
+    if (operation.name != null) project.name = operation.name.trim();
+    if (operation.canvasPreset != null) { project.canvasPreset = operation.canvasPreset; project.canvas = canvasSizes[operation.canvasPreset]; }
+    if (operation.frameRate != null) { project.frameRate = `fps${operation.frameRate}`; project.exportPreferences.frameRate = `fps${operation.frameRate}`; }
+    if (operation.exportResolution != null) project.exportPreferences.resolution = operation.exportResolution;
+    if (operation.exportCodec != null) project.exportPreferences.codec = operation.exportCodec;
+    if (operation.exportQuality != null) project.exportPreferences.quality = operation.exportQuality;
+    return;
+  }
+  if (operation.type === "insert_gap") {
+    insertGap(project, operation.atSeconds, operation.durationSeconds);
+    return;
+  }
+  if (operation.type === "remove_time_range") {
+    removeTimeRange(project, operation.startSeconds, operation.durationSeconds);
+    return;
+  }
+  if (operation.type === "add_marker") {
+    project.timeline.markers.push({ id: randomUUID(), time: rational(operation.atSeconds), name: operation.name, colorHex: "#F7C948FF" });
+    project.timeline.markers.sort((left, right) => seconds(left.time) - seconds(right.time));
+    return;
+  }
   if (operation.type === "add_text") {
     const clip = makeTextClip(operation);
     const track = compatibleTrack(project, "video", operation.startSeconds, operation.durationSeconds);
@@ -395,6 +489,7 @@ function applyOperation(project, operation) {
     if (missing.length > 0) throw new AutomationError("clip_not_found", `Clip ${missing[0]} was not found.`, { clipIds: missing });
     for (const track of project.timeline.tracks) {
       const removed = track.clips.filter(clip => ids.has(clip.id));
+      if (removed.length > 0 && track.isLocked) throw new AutomationError("track_locked", `Track ${track.name} is locked.`);
       track.clips = track.clips.filter(clip => !ids.has(clip.id));
       if (operation.ripple) for (const clip of track.clips) for (const item of removed.filter(item => seconds(item.timelineStart) + seconds(item.duration) <= seconds(clip.timelineStart))) clip.timelineStart = rational(seconds(clip.timelineStart) - seconds(item.duration));
     }
@@ -402,6 +497,43 @@ function applyOperation(project, operation) {
   }
   const found = all().find(item => item.clip.id === operation.clipId);
   if (!found) throw new AutomationError("clip_not_found", `Clip ${operation.clipId} was not found.`);
+  if (found.track.isLocked) throw new AutomationError("track_locked", `Track ${found.track.name} is locked.`);
+  if (operation.type === "duplicate_clip") {
+    const duplicate = structuredClone(found.clip);
+    duplicate.id = randomUUID();
+    duplicate.timelineStart = rational(operation.atSeconds ?? firstAvailableStart(
+      found.track.clips,
+      seconds(found.clip.timelineStart) + seconds(found.clip.duration),
+      seconds(found.clip.duration),
+      found.clip.id
+    ));
+    delete duplicate.groupID;
+    delete duplicate.linkGroupID;
+    found.track.clips.push(duplicate);
+    relocateIfOverlapping(project, { track: found.track, clip: duplicate });
+    return;
+  }
+  if (operation.type === "detach_audio") {
+    const asset = project.assets.find(item => item.id === found.clip.assetID);
+    if (found.clip.kind !== "video" || !asset?.metadata?.hasAudio)
+      throw new AutomationError("media_has_no_audio", "The selected video does not contain detachable audio.");
+    const start = seconds(found.clip.timelineStart); const duration = seconds(found.clip.duration);
+    let destination = operation.audioTrackId == null
+      ? project.timeline.tracks.find(track => track.kind === "audio" && !track.isLocked && track.clips.every(clip => !overlap(start, duration, seconds(clip.timelineStart), seconds(clip.duration))))
+      : project.timeline.tracks.find(track => track.id === operation.audioTrackId);
+    if (!destination && operation.audioTrackId == null) { destination = emptyTrack("audio", project.timeline.tracks); project.timeline.tracks.push(destination); }
+    if (!destination || destination.kind !== "audio" || destination.isLocked || destination.clips.some(clip => overlap(start, duration, seconds(clip.timelineStart), seconds(clip.duration))))
+      throw new AutomationError("track_unavailable", "Choose an unlocked audio track without another clip in that range.");
+    const audio = structuredClone(found.clip);
+    audio.id = randomUUID(); audio.kind = "audio"; audio.isVideoMuted = true;
+    audio.transform = { positionX: 0, positionY: 0, scale: 1, rotationDegrees: 0, cropTop: 0, cropLeading: 0, cropBottom: 0, cropTrailing: 0, contentMode: "fit" };
+    audio.opacity = 1;
+    delete audio.groupID; delete audio.linkGroupID;
+    found.clip.audioVolume = 0;
+    destination.clips.push(audio);
+    destination.clips.sort((left, right) => seconds(left.timelineStart) - seconds(right.timelineStart));
+    return;
+  }
   if (operation.type === "update_clip") {
     if (operation.timelineStartSeconds != null) found.clip.timelineStart = rational(operation.timelineStartSeconds);
     if (operation.sourceStartSeconds != null) found.clip.sourceStart = rational(operation.sourceStartSeconds);
@@ -422,6 +554,20 @@ function applyOperation(project, operation) {
       if (!found.clip.textStyle) throw new AutomationError("clip_kind_invalid", "Only text clips can update text.");
       found.clip.textStyle.text = operation.text;
     }
+    if (operation.cropTop != null) found.clip.transform.cropTop = operation.cropTop;
+    if (operation.cropLeading != null) found.clip.transform.cropLeading = operation.cropLeading;
+    if (operation.cropBottom != null) found.clip.transform.cropBottom = operation.cropBottom;
+    if (operation.cropTrailing != null) found.clip.transform.cropTrailing = operation.cropTrailing;
+    if (found.clip.transform.cropTop + found.clip.transform.cropBottom >= 1 || found.clip.transform.cropLeading + found.clip.transform.cropTrailing >= 1)
+      throw new AutomationError("invalid_crop", "Opposite crop edges must leave part of the image visible.");
+    if (operation.videoFadeInSeconds != null) found.clip.fades.videoIn = rational(operation.videoFadeInSeconds);
+    if (operation.videoFadeOutSeconds != null) found.clip.fades.videoOut = rational(operation.videoFadeOutSeconds);
+    if (operation.audioFadeInSeconds != null) found.clip.fades.audioIn = rational(operation.audioFadeInSeconds);
+    if (operation.audioFadeOutSeconds != null) found.clip.fades.audioOut = rational(operation.audioFadeOutSeconds);
+    if (operation.effects != null) found.clip.effects = operation.effects.map(item => ({ id: randomUUID(), kind: item.kind, isEnabled: true, amount: item.amount }));
+    if (operation.transitionIn !== undefined) found.clip.transitionIn = operation.transitionIn == null ? undefined : { kind: operation.transitionIn.kind, duration: rational(operation.transitionIn.durationSeconds) };
+    if (operation.transitionOut !== undefined) found.clip.transitionOut = operation.transitionOut == null ? undefined : { kind: operation.transitionOut.kind, duration: rational(operation.transitionOut.durationSeconds) };
+    clampClipDurations(found.clip);
     relocateIfOverlapping(project, found);
     return;
   }
@@ -442,13 +588,108 @@ function applyOperation(project, operation) {
 
 function compatibleTrack(project, kind, start, duration, excludedClipId) {
   let track = project.timeline.tracks
-    .filter(item => item.kind === kind)
+    .filter(item => item.kind === kind && !item.isLocked)
     .find(item => item.clips.every(clip => clip.id === excludedClipId || !overlap(start, duration, seconds(clip.timelineStart), seconds(clip.duration))));
   if (!track) {
     track = emptyTrack(kind, project.timeline.tracks);
     project.timeline.tracks.push(track);
   }
   return track;
+}
+
+function insertGap(project, atSeconds, durationSeconds) {
+  const timelineDuration = Math.max(0, ...project.timeline.tracks.flatMap(track => track.clips.map(clip => seconds(clip.timelineStart) + seconds(clip.duration))));
+  if (atSeconds >= timelineDuration)
+    throw new AutomationError("invalid_gap", "A black pause must be inserted before the end of existing timeline content.");
+  for (const track of project.timeline.tracks) {
+    if (track.isLocked && track.clips.some(clip => seconds(clip.timelineStart) + seconds(clip.duration) > atSeconds))
+      throw new AutomationError("track_locked", `Track ${track.name} is locked.`);
+    const edited = [];
+    for (const clip of track.clips) {
+      const start = seconds(clip.timelineStart); const duration = seconds(clip.duration); const end = start + duration;
+      if (start >= atSeconds) { clip.timelineStart = rational(start + durationSeconds); edited.push(clip); }
+      else if (end > atSeconds) {
+        const leftDuration = atSeconds - start;
+        edited.push(segmentClip(clip, 0, leftDuration, true));
+        const right = segmentClip(clip, leftDuration, end - atSeconds, false);
+        right.timelineStart = rational(atSeconds + durationSeconds);
+        edited.push(right);
+      } else edited.push(clip);
+    }
+    track.clips = edited.sort((left, right) => seconds(left.timelineStart) - seconds(right.timelineStart));
+  }
+  for (const marker of project.timeline.markers) if (seconds(marker.time) >= atSeconds) marker.time = rational(seconds(marker.time) + durationSeconds);
+  project.timeline.markers.sort((left, right) => seconds(left.time) - seconds(right.time));
+}
+
+function removeTimeRange(project, startSeconds, durationSeconds) {
+  const endSeconds = startSeconds + durationSeconds;
+  for (const track of project.timeline.tracks) {
+    if (track.isLocked && track.clips.some(clip => seconds(clip.timelineStart) + seconds(clip.duration) > startSeconds))
+      throw new AutomationError("track_locked", `Track ${track.name} is locked.`);
+    const edited = [];
+    for (const clip of track.clips) {
+      const start = seconds(clip.timelineStart); const duration = seconds(clip.duration); const end = start + duration;
+      if (end <= startSeconds) edited.push(clip);
+      else if (start >= endSeconds) { clip.timelineStart = rational(start - durationSeconds); edited.push(clip); }
+      else {
+        if (start < startSeconds) edited.push(segmentClip(clip, 0, startSeconds - start, true));
+        if (end > endSeconds) {
+          const right = segmentClip(clip, endSeconds - start, end - endSeconds, false);
+          right.timelineStart = rational(startSeconds);
+          edited.push(right);
+        }
+      }
+    }
+    track.clips = edited.sort((left, right) => seconds(left.timelineStart) - seconds(right.timelineStart));
+  }
+  project.timeline.markers = project.timeline.markers.flatMap(marker => {
+    const time = seconds(marker.time);
+    if (time >= startSeconds && time < endSeconds) return [];
+    if (time >= endSeconds) marker.time = rational(time - durationSeconds);
+    return [marker];
+  }).sort((left, right) => seconds(left.time) - seconds(right.time));
+}
+
+function segmentClip(original, offsetSeconds, durationSeconds, preserveId) {
+  const segment = structuredClone(original);
+  if (!preserveId) segment.id = randomUUID();
+  segment.timelineStart = rational(seconds(original.timelineStart) + offsetSeconds);
+  segment.duration = rational(durationSeconds);
+  if (original.kind !== "text" && original.kind !== "image") {
+    segment.sourceStart = rational(seconds(original.sourceStart) + (original.isReversed
+      ? (seconds(original.duration) - offsetSeconds - durationSeconds) * original.playbackRate
+      : offsetSeconds * original.playbackRate));
+  }
+  if (offsetSeconds > 0) delete segment.transitionIn;
+  if (offsetSeconds + durationSeconds < seconds(original.duration)) delete segment.transitionOut;
+  const half = durationSeconds / 2;
+  for (const key of ["videoIn", "videoOut", "audioIn", "audioOut"]) segment.fades[key] = rational(Math.min(seconds(segment.fades[key]), half));
+  for (const key of ["positionX", "positionY", "scale", "rotationDegrees", "opacity", "volume"]) {
+    segment.keyframes[key] = (original.keyframes[key] ?? []).filter(frame => {
+      const time = seconds(frame.time); return time >= offsetSeconds && time <= offsetSeconds + durationSeconds;
+    }).map(frame => ({ ...frame, time: rational(seconds(frame.time) - offsetSeconds) }));
+  }
+  return segment;
+}
+
+function clampClipDurations(clip) {
+  const half = seconds(clip.duration) / 2;
+  for (const key of ["videoIn", "videoOut", "audioIn", "audioOut"]) clip.fades[key] = rational(Math.min(seconds(clip.fades[key]), half));
+  if (clip.transitionIn) clip.transitionIn.duration = rational(Math.min(seconds(clip.transitionIn.duration), seconds(clip.duration)));
+  if (clip.transitionOut) clip.transitionOut.duration = rational(Math.min(seconds(clip.transitionOut.duration), seconds(clip.duration)));
+}
+
+function firstAvailableStart(clips, start, duration, excludedId) {
+  let candidate = start;
+  const ordered = clips.filter(clip => clip.id !== excludedId).sort((left, right) => seconds(left.timelineStart) - seconds(right.timelineStart));
+  for (const clip of ordered) {
+    const clipStart = seconds(clip.timelineStart); const clipEnd = clipStart + seconds(clip.duration);
+    if (clipEnd <= candidate) continue;
+    if (candidate + duration <= clipStart) return candidate;
+    candidate = clipEnd;
+  }
+  return candidate;
 }
 
 function relocateIfOverlapping(project, found) {
@@ -484,4 +725,10 @@ function isWithin(root, candidate) {
   const comparableCandidate = comparablePath(candidate);
   const prefix = comparableRoot.endsWith(path.sep) ? comparableRoot : comparableRoot + path.sep;
   return comparableCandidate === comparableRoot || comparableCandidate.startsWith(prefix);
+}
+
+function validateSourceRange(inspection, startSeconds, durationSeconds) {
+  if (inspection.durationSeconds == null) return;
+  if (startSeconds >= inspection.durationSeconds || (durationSeconds != null && startSeconds + durationSeconds > inspection.durationSeconds + 0.0001))
+    throw new AutomationError("source_range_invalid", "The requested range is outside the source media.");
 }

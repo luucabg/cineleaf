@@ -13,6 +13,17 @@ Implemented in the current source:
 
 Remaining release work is hands-on validation, profiling, installation, and real screenshots on physical Mac hardware. These are evidence gates, not more hidden features.
 
+## 0.3.0 beta — practical editor utilities
+
+Implemented in the current source:
+
+- Change project format, frame rate, export resolution, codec and quality after creating a project.
+- Insert an exact black pause, remove a time range, duplicate into the next free position and detach audio without colliding with adjacent clips.
+- Extract original audio as M4A and save a source frame as PNG through cancellable, verified and atomic jobs.
+- Full Windows inspector for display mode, enable/reverse/video visibility, fades, crop and entrance/exit transitions.
+- The same structured controls for AI: project settings, gaps, range removal, duplicate, audio detachment, crop, effects, transitions, audio extraction and frame capture.
+- Regression tests for locked tracks, split continuity, silent assets, path isolation, output conflicts, failed overwrite recovery and real FFmpeg media.
+
 ## Next — deeper editing and polish
 
 - Handle-based transitions between adjacent clips with a dedicated transition editor.
@@ -30,6 +41,6 @@ Remaining release work is hands-on validation, profiling, installation, and real
 - Adjustment layers, nested timelines, and multicam foundations.
 - Color scopes and expanded audio metering.
 - An optional extension architecture and, only after a licensing review, an isolated external media backend.
-- Optional native speech-to-subtitle and media-analysis tools exposed directly through MCP, while retaining the current local-only privacy model.
+- Optional native speech-to-subtitle and richer media-analysis tools exposed directly through MCP, while retaining the current local-only privacy model.
 
 Advanced tools must remain local, optional, cancellable, and honest about hardware support. Cineleaf will not require a paid API, account, or media upload.

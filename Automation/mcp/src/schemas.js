@@ -11,6 +11,9 @@ const transition = z.object({
   kind: z.enum(["crossDissolve", "fadeThroughBlack", "slideLeft", "slideRight", "wipeLeft", "blur"]),
   durationSeconds: positiveSeconds.max(30).default(0.5)
 }).strict();
+const canvasPreset = z.enum(["landscape16x9", "vertical9x16", "square1x1", "portrait4x5"]);
+const frameRate = z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]);
+const exportResolution = z.enum(["p720", "p1080", "p1440", "p2160"]);
 
 export const mediaClipSchema = z.object({
   path: z.string().min(1).max(32767),
@@ -58,12 +61,12 @@ export const createVideoSchema = z.object({
   projectPath: z.string().min(1).max(32767),
   outputPath: z.string().min(1).max(32767).optional(),
   name: z.string().min(1).max(200).default("AI Video"),
-  canvasPreset: z.enum(["landscape16x9", "vertical9x16", "square1x1", "portrait4x5"]).default("landscape16x9"),
-  frameRate: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).default(30),
+  canvasPreset: canvasPreset.default("landscape16x9"),
+  frameRate: frameRate.default(30),
   media: z.array(mediaClipSchema).max(500).default([]),
   texts: z.array(textClipSchema).max(500).default([]),
   export: z.object({
-    resolution: z.enum(["p720", "p1080", "p1440", "p2160"]).default("p1080"),
+    resolution: exportResolution.default("p1080"),
     codec: z.enum(["h264", "hevc"]).default("h264"),
     quality: z.enum(["compact", "balanced", "high"]).default("balanced")
   }).strict().default({}),
@@ -92,10 +95,34 @@ const editOperation = z.discriminatedUnion("type", [
     muted: z.boolean().optional(),
     enabled: z.boolean().optional(),
     name: z.string().min(1).max(200).optional(),
-    text: z.string().min(1).max(10000).optional()
+    text: z.string().min(1).max(10000).optional(),
+    cropTop: z.number().finite().min(0).max(0.99).optional(),
+    cropLeading: z.number().finite().min(0).max(0.99).optional(),
+    cropBottom: z.number().finite().min(0).max(0.99).optional(),
+    cropTrailing: z.number().finite().min(0).max(0.99).optional(),
+    videoFadeInSeconds: seconds.max(60).optional(),
+    videoFadeOutSeconds: seconds.max(60).optional(),
+    audioFadeInSeconds: seconds.max(60).optional(),
+    audioFadeOutSeconds: seconds.max(60).optional(),
+    effects: z.array(effect).max(16).optional(),
+    transitionIn: transition.nullable().optional(),
+    transitionOut: transition.nullable().optional()
   }).strict(),
   z.object({ type: z.literal("split_clip"), clipId: z.string().uuid(), atSeconds: seconds }).strict(),
+  z.object({ type: z.literal("duplicate_clip"), clipId: z.string().uuid(), atSeconds: seconds.optional() }).strict(),
+  z.object({ type: z.literal("detach_audio"), clipId: z.string().uuid(), audioTrackId: z.string().uuid().optional() }).strict(),
   z.object({ type: z.literal("delete_clips"), clipIds: z.array(z.string().uuid()).min(1).max(500), ripple: z.boolean().default(false) }).strict(),
+  z.object({ type: z.literal("insert_gap"), atSeconds: seconds, durationSeconds: positiveSeconds }).strict(),
+  z.object({ type: z.literal("remove_time_range"), startSeconds: seconds, durationSeconds: positiveSeconds }).strict(),
+  z.object({
+    type: z.literal("update_project_settings"),
+    name: z.string().min(1).max(200).optional(),
+    canvasPreset: canvasPreset.optional(),
+    frameRate: frameRate.optional(),
+    exportResolution: exportResolution.optional(),
+    exportCodec: z.enum(["h264", "hevc"]).optional(),
+    exportQuality: z.enum(["compact", "balanced", "high"]).optional()
+  }).strict(),
   z.object({ type: z.literal("add_marker"), atSeconds: seconds, name: z.string().min(1).max(200).default("Marker") }).strict(),
   textClipSchema.extend({ type: z.literal("add_text") })
 ]);
@@ -111,4 +138,23 @@ export const editProjectSchema = z.object({
 export const batchSchema = z.object({
   jobs: z.array(createVideoSchema).min(1).max(32),
   concurrency: z.number().int().min(1).max(4).default(2)
+}).strict();
+
+export const extractAudioSchema = z.object({
+  sourcePath: z.string().min(1).max(32767),
+  outputPath: z.string().min(1).max(32767),
+  startSeconds: seconds.default(0),
+  durationSeconds: positiveSeconds.optional(),
+  dryRun: z.boolean().default(true),
+  confirmWrite: z.boolean().default(false),
+  overwrite: z.boolean().default(false)
+}).strict();
+
+export const extractFrameSchema = z.object({
+  sourcePath: z.string().min(1).max(32767),
+  outputPath: z.string().min(1).max(32767),
+  atSeconds: seconds.default(0),
+  dryRun: z.boolean().default(true),
+  confirmWrite: z.boolean().default(false),
+  overwrite: z.boolean().default(false)
 }).strict();

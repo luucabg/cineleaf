@@ -4,6 +4,33 @@ All notable changes are recorded here. Cineleaf follows semantic versioning afte
 
 ## Unreleased
 
+## 0.3.0-beta.1 — 2026-07-27
+
+### Added
+
+- Project settings on Mac and Windows for canvas format, 24–60 fps, 720p–4K export resolution, codec and quality.
+- Exact black-pause insertion, interval removal, safe duplication and independent audio detachment with locked-track protection.
+- Original-audio extraction to M4A and current/source-frame capture to PNG through verified temporary outputs.
+- Windows inspector controls for fit/fill/crop, clip visibility, reverse, video-only hiding, fades, crop edges and entrance/exit transitions.
+- MCP operations for project settings, gaps, range removal, duplicate, detached audio, crop, fades, effects and transitions.
+- MCP tools for local audio and frame extraction with dry runs, allowed-root checks, explicit writes, extension validation and atomic promotion.
+- Keyboard shortcuts for duplicate, markers, black pauses and audio detachment on both platforms.
+
+### Fixed
+
+- Duplicating a clip beside occupied material now uses the earliest compatible free position instead of producing an overlap.
+- Audio detachment now selects a non-overlapping audio track, rejects silent assets and creates a truly independent clip.
+- Gap insertion preserves source-time mapping, reverse playback, fades, transitions, keyframes and marker timing across splits.
+- Windows window disposal no longer calls itself recursively.
+
+### Performance and compatibility
+
+- New media utilities run asynchronously, are cancellable and avoid full-timeline composition for source-only extraction.
+- The shared `.cineleaf` format remains version 2 and the native automation protocol remains version 1; all new API fields and operations are additive.
+- Regression benchmarks and their limits are recorded in `Documentation/PERFORMANCE.md`.
+
+## 0.2.0-beta.1 — 2026-07-27
+
 ### Added
 
 - Local MCP server and native Windows/macOS automation bridges for structured AI control without screen scraping.
