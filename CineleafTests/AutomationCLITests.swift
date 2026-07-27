@@ -2,10 +2,16 @@ import XCTest
 
 final class AutomationCLITests: XCTestCase {
     func testNativeAutomationCLIReportsStructuredCapabilities() throws {
-        let executable = Bundle(for: AutomationCLITests.self).bundleURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("CineleafCLI")
-        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: executable.path))
+        var directory = Bundle(for: AutomationCLITests.self).bundleURL
+        var candidates: [URL] = []
+        for _ in 0..<8 {
+            candidates.append(directory.appendingPathComponent("CineleafCLI"))
+            directory.deleteLastPathComponent()
+        }
+        let executable = try XCTUnwrap(
+            candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) },
+            "CineleafCLI was not found in the bounded Xcode products ancestry."
+        )
         let output = Pipe()
         let process = Process()
         process.executableURL = executable
