@@ -2,8 +2,10 @@ import XCTest
 
 final class AutomationCLITests: XCTestCase {
     func testNativeAutomationCLIReportsStructuredCapabilities() throws {
-        let products = try XCTUnwrap(ProcessInfo.processInfo.environment["BUILT_PRODUCTS_DIR"])
-        let executable = URL(fileURLWithPath: products).appendingPathComponent("CineleafCLI")
+        let executable = Bundle(for: AutomationCLITests.self).bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("CineleafCLI")
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: executable.path))
         let output = Pipe()
         let process = Process()
         process.executableURL = executable
