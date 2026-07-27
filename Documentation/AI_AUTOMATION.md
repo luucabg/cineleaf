@@ -102,7 +102,7 @@ Tras aprobar el resumen, la IA añade `confirmWrite: true`, `dryRun: false` y un
 - Los procesos nativos se inician sin intérprete de comandos, para que las rutas sean datos y no órdenes de shell.
 - La salida de protocolo tiene un límite de tamaño y los diagnósticos se separan del canal MCP.
 - Los guardados usan archivos temporales, validación nativa, renombrado atómico y restauración si falla una sustitución.
-- Las ediciones simultáneas del mismo proyecto se serializan para no perder cambios; una salida existente nunca se reemplaza sin `overwrite=true`.
+- Las ediciones simultáneas del mismo proyecto se serializan dentro de una misma instancia del servidor MCP para no perder cambios; una salida existente nunca se reemplaza sin `overwrite=true`. No ejecutes dos servidores MCP distintos sobre el mismo proyecto al mismo tiempo.
 - Los cachés tienen límites y se invalidan cuando cambia el tamaño o la fecha del archivo.
 
 El servidor MCP no llama por sí solo a ninguna API de modelos. La privacidad final también depende del cliente de IA elegido y de si ese cliente envía el texto, los nombres de archivo o el contenido multimedia a un servicio externo.
