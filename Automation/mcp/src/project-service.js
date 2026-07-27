@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,8 +26,9 @@ export class AutomationError extends Error {
 export class ProjectService {
   constructor({ roots, adapter }) {
     if (!Array.isArray(roots) || roots.length === 0) throw new Error("At least one allowed root is required.");
-    this.roots = roots.map(item => path.resolve(item));
+    this.roots = roots.map(item => canonicalPath(item));
     this.adapter = adapter;
+    this.projectLocks = new Map();
   }
 
   async createVideo(rawRequest, context = {}) {
@@ -36,10 +38,20 @@ export class ProjectService {
     if (path.extname(projectPath).toLowerCase() !== ".cineleaf")
       throw new AutomationError("invalid_project_path", "Project paths must end in .cineleaf.");
     const outputPath = request.outputPath ? this.#allowed(request.outputPath, "outputPath") : undefined;
-    for (const clip of request.media) this.#allowed(clip.path, "media.path");
+    const canonicalMedia = new Map();
+    for (const clip of request.media) {
+      const key = comparablePath(path.resolve(clip.path));
+      if (!canonicalMedia.has(key)) canonicalMedia.set(key, this.#allowed(clip.path, "media.path"));
+      clip.path = canonicalMedia.get(key);
+    }
+    if (outputPath && request.media.some(clip => samePath(clip.path, outputPath)))
+      throw new AutomationError("output_conflicts_with_source", "outputPath cannot replace one of the source media files.");
     if (!dryRun && !request.confirmWrite) throw new AutomationError("confirmation_required", "Set confirmWrite=true after reviewing a dry run.");
     if (!dryRun && !request.idempotencyKey) throw new AutomationError("idempotency_key_required", "Writes require an idempotencyKey so retries are safe.");
+    return this.#withProjectLock(projectPath, () => this.#createVideoLocked(request, dryRun, projectPath, outputPath, context));
+  }
 
+  async #createVideoLocked(request, dryRun, projectPath, outputPath, context) {
     const requestHash = hashRequest({ ...request, dryRun: false, confirmWrite: true });
     let resume;
     if (!dryRun) {
@@ -48,6 +60,8 @@ export class ProjectService {
       resume = replay?.state === "pending";
       if (await exists(projectPath) && !request.overwrite && !resume)
         throw new AutomationError("project_exists", "The project already exists. Use overwrite=true only after confirming replacement.");
+      if (outputPath && await exists(outputPath) && !request.overwrite && !resume)
+        throw new AutomationError("output_exists", "The output file already exists. Use overwrite=true only after confirming replacement.");
     }
 
     let project;
@@ -115,6 +129,10 @@ export class ProjectService {
     const projectPath = this.#allowed(request.projectPath, "projectPath");
     if (!dryRun && !request.confirmWrite) throw new AutomationError("confirmation_required", "Set confirmWrite=true after reviewing a dry run.");
     if (!dryRun && !request.idempotencyKey) throw new AutomationError("idempotency_key_required", "Writes require an idempotencyKey.");
+    return this.#withProjectLock(projectPath, () => this.#editProjectLocked(request, dryRun, projectPath));
+  }
+
+  async #editProjectLocked(request, dryRun, projectPath) {
     const requestHash = hashRequest({ ...request, dryRun: false, confirmWrite: true });
     if (!dryRun) {
       const replay = await this.#readEditReplay(projectPath, request.idempotencyKey, requestHash);
@@ -143,10 +161,23 @@ export class ProjectService {
 
   #allowed(value, field) {
     if (typeof value !== "string" || value.length === 0) throw new AutomationError("validation_error", `${field} is required.`);
-    const candidate = path.resolve(value);
-    if (!this.roots.some(root => candidate === root || candidate.startsWith(root + path.sep)))
+    const candidate = canonicalPath(value);
+    if (!this.roots.some(root => isWithin(root, candidate)))
       throw new AutomationError("path_outside_allowed_roots", `${field} is outside the configured allowed roots.`, { field, candidate });
     return candidate;
+  }
+
+  async #withProjectLock(projectPath, action) {
+    const previous = this.projectLocks.get(projectPath) ?? Promise.resolve();
+    let release;
+    const current = new Promise(resolve => { release = resolve; });
+    this.projectLocks.set(projectPath, current);
+    await previous;
+    try { return await action(); }
+    finally {
+      release();
+      if (this.projectLocks.get(projectPath) === current) this.projectLocks.delete(projectPath);
+    }
   }
 
   #buildProject(request, inspections) {
@@ -329,7 +360,23 @@ function summarize(project) { const clips = project.timeline.tracks.flatMap(trac
 function hashRequest(request) { return createHash("sha256").update(JSON.stringify(sortObject(request))).digest("hex"); }
 function sortObject(value) { if (Array.isArray(value)) return value.map(sortObject); if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, sortObject(value[key])])); return value; }
 async function exists(target) { try { await stat(target); return true; } catch (error) { if (error?.code === "ENOENT") return false; throw error; } }
-async function mapLimit(items, concurrency, action) { const results = new Array(items.length); let next = 0; async function worker() { for (;;) { const index = next++; if (index >= items.length) return; results[index] = await action(items[index], index); } } await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(items.length, 1)) }, worker)); return results; }
+async function mapLimit(items, concurrency, action) {
+  const results = new Array(items.length);
+  let next = 0;
+  let failure;
+  async function worker() {
+    for (;;) {
+      if (failure) return;
+      const index = next++;
+      if (index >= items.length) return;
+      try { results[index] = await action(items[index], index); }
+      catch (error) { failure ??= error; return; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(items.length, 1)) }, worker));
+  if (failure) throw failure;
+  return results;
+}
 
 function applyOperation(project, operation) {
   const all = () => project.timeline.tracks.flatMap(track => track.clips.map(clip => ({ track, clip })));
@@ -343,6 +390,9 @@ function applyOperation(project, operation) {
   }
   if (operation.type === "delete_clips") {
     const ids = new Set(operation.clipIds);
+    const existing = new Set(all().map(item => item.clip.id));
+    const missing = operation.clipIds.filter(id => !existing.has(id));
+    if (missing.length > 0) throw new AutomationError("clip_not_found", `Clip ${missing[0]} was not found.`, { clipIds: missing });
     for (const track of project.timeline.tracks) {
       const removed = track.clips.filter(clip => ids.has(clip.id));
       track.clips = track.clips.filter(clip => !ids.has(clip.id));
@@ -381,7 +431,11 @@ function applyOperation(project, operation) {
     const leftDuration = operation.atSeconds - start;
     const right = structuredClone(found.clip);
     right.id = randomUUID(); right.timelineStart = rational(operation.atSeconds); right.duration = rational(duration - leftDuration);
-    if (right.kind !== "text" && !right.isReversed) right.sourceStart = rational(seconds(right.sourceStart) + leftDuration * right.playbackRate);
+    if (right.kind !== "text") {
+      const leftSourceDuration = leftDuration * right.playbackRate;
+      if (right.isReversed) found.clip.sourceStart = rational(seconds(found.clip.sourceStart) + duration * right.playbackRate - leftSourceDuration);
+      else right.sourceStart = rational(seconds(right.sourceStart) + leftSourceDuration);
+    }
     found.clip.duration = rational(leftDuration); found.track.clips.push(right); found.track.clips.sort((a, b) => seconds(a.timelineStart) - seconds(b.timelineStart));
   }
 }
@@ -408,4 +462,26 @@ function relocateIfOverlapping(project, found) {
   const destination = compatibleTrack(project, found.track.kind, start, duration, found.clip.id);
   destination.clips.push(found.clip);
   destination.clips.sort((left, right) => seconds(left.timelineStart) - seconds(right.timelineStart));
+}
+
+function canonicalPath(value) {
+  const suffix = [];
+  let current = path.resolve(value);
+  while (!existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    suffix.unshift(path.basename(current));
+    current = parent;
+  }
+  const base = existsSync(current) ? realpathSync.native(current) : current;
+  return path.resolve(base, ...suffix);
+}
+
+function comparablePath(value) { return process.platform === "win32" ? value.toLowerCase() : value; }
+function samePath(left, right) { return comparablePath(left) === comparablePath(right); }
+function isWithin(root, candidate) {
+  const comparableRoot = comparablePath(root);
+  const comparableCandidate = comparablePath(candidate);
+  const prefix = comparableRoot.endsWith(path.sep) ? comparableRoot : comparableRoot + path.sep;
+  return comparableCandidate === comparableRoot || comparableCandidate.startsWith(prefix);
 }

@@ -22,3 +22,15 @@ test("parses structured native CLI output without using a shell", async () => {
   assert.equal(result.durationSeconds, 3);
   assert.equal(await readFile(count, "utf8"), "1");
 });
+
+test("reassembles progress messages split across native stderr chunks", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-cli-progress-"));
+  const fake = path.join(root, "fake-progress.mjs");
+  await writeFile(fake, `process.stderr.write('{"type":"pro');setTimeout(()=>{process.stderr.write('gress","progress":0.5}\\n');process.stdout.write(JSON.stringify({ok:true,data:{path:'out.mp4'}})+'\\n')},10)`, "utf8");
+  const adapter = new NativeCliAdapter({ executable: process.execPath, prefixArguments: [fake] });
+  const progress = [];
+
+  await adapter.renderProject("project.cineleaf", "out.mp4", { resolution: "p720", codec: "h264", quality: "compact" }, undefined, value => progress.push(value));
+
+  assert.deepEqual(progress, [0.5]);
+});

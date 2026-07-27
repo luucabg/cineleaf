@@ -123,7 +123,7 @@ En Windows, Cineleaf puede transcribir el audio usando el reconocimiento instala
 
 ## Estado de calidad
 
-Windows pasa 33 pruebas unitarias, 13 pruebas del contrato MCP, 2 pruebas de integración con FFmpeg real y una exportación sintética que se vuelve a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. Mac mantiene sus pruebas automatizadas, suma una prueba del puente nativo de IA y verifica una exportación sintética en GitHub Actions.
+Windows pasa 33 pruebas unitarias, 21 pruebas del contrato MCP, 2 pruebas de integración con FFmpeg real y una exportación sintética que se vuelve a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. Mac mantiene sus pruebas automatizadas, suma una prueba del puente nativo de IA y verifica una exportación sintética en GitHub Actions.
 
 No es honesto prometer que ningún programa tiene cero bugs. En esta beta no quedan fallos bloqueantes conocidos después de esas comprobaciones. La revisión visual por píxeles de Windows quedó pendiente porque la sesión de escritorio usada para construirlo estaba bloqueada; el proceso sí arrancó y permaneció estable. En Mac sigue pendiente una prueba manual completa en hardware físico. Consulta [STATUS.md](STATUS.md).
 

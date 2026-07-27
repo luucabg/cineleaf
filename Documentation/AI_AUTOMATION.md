@@ -98,10 +98,11 @@ Tras aprobar el resumen, la IA añade `confirmWrite: true`, `dryRun: false` y un
 ## Privacidad y protección
 
 - El servidor usa transporte local por entrada/salida estándar; no abre un puerto ni incluye telemetría.
-- Las rutas se normalizan y deben quedar dentro de una carpeta autorizada.
+- Las rutas se normalizan, se resuelven enlaces simbólicos y uniones de directorio, y deben quedar realmente dentro de una carpeta autorizada.
 - Los procesos nativos se inician sin intérprete de comandos, para que las rutas sean datos y no órdenes de shell.
 - La salida de protocolo tiene un límite de tamaño y los diagnósticos se separan del canal MCP.
 - Los guardados usan archivos temporales, validación nativa, renombrado atómico y restauración si falla una sustitución.
+- Las ediciones simultáneas del mismo proyecto se serializan para no perder cambios; una salida existente nunca se reemplaza sin `overwrite=true`.
 - Los cachés tienen límites y se invalidan cuando cambia el tamaño o la fecha del archivo.
 
 El servidor MCP no llama por sí solo a ninguna API de modelos. La privacidad final también depende del cliente de IA elegido y de si ese cliente envía el texto, los nombres de archivo o el contenido multimedia a un servicio externo.
@@ -110,4 +111,4 @@ El servidor MCP no llama por sí solo a ninguna API de modelos. La privacidad fi
 
 La planificación deduplica inspecciones del mismo archivo, trabaja con concurrencia limitada, conserva el orden del lote y delega la exportación al motor nativo. Windows prueba primero codificadores de hardware compatibles; Mac usa AVFoundation. La exportación siempre lee los originales, aunque la vista previa utilice derivados más ligeros.
 
-En la medición reproducible de Windows, validar las solicitudes, construir 32 proyectos de 100 clips y crear/eliminar sus paquetes temporales de validación tuvo una mediana de 86,391 ms con Node.js 24.16.0. No incluye validación nativa, lectura real de vídeo ni exportación. Ejecuta `npm run benchmark --prefix Automation/mcp` para repetirla; las medidas completas están en [PERFORMANCE.md](PERFORMANCE.md).
+En la medición reproducible de Windows, validar las solicitudes y rutas reales, construir 32 proyectos de 100 clips y crear/eliminar sus paquetes temporales de validación tuvo una mediana de 93,411 ms con Node.js 24.16.0. No incluye validación nativa, lectura real de vídeo ni exportación. Ejecuta `npm run benchmark --prefix Automation/mcp` para repetirla; las medidas completas están en [PERFORMANCE.md](PERFORMANCE.md).

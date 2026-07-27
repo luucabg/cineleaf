@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -96,6 +96,37 @@ test("rejects paths outside allowed roots and writes without confirmation", asyn
   );
 });
 
+test("rejects an output overwrite unless overwrite is explicitly confirmed", async () => {
+  const { root, service } = await setup();
+  const outputPath = path.join(root, "existing.mp4");
+  await writeFile(outputPath, "keep me", "utf8");
+  await assert.rejects(
+    service.createVideo({
+      projectPath: path.join(root, "new.cineleaf"), outputPath, media: [],
+      dryRun: false, confirmWrite: true, idempotencyKey: "no-output-overwrite"
+    }),
+    error => error instanceof AutomationError && error.code === "output_exists"
+  );
+});
+
+test("canonical path checks reject a junction or symlink that escapes an allowed root", async () => {
+  const { root, service } = await setup();
+  const outside = await mkdtemp(path.join(tmpdir(), "cineleaf-outside-"));
+  const link = path.join(root, "outside-link");
+  await symlink(outside, link, process.platform === "win32" ? "junction" : "dir");
+  await assert.rejects(
+    service.createVideo({ projectPath: path.join(link, "escape.cineleaf"), media: [], dryRun: true }),
+    error => error instanceof AutomationError && error.code === "path_outside_allowed_roots"
+  );
+});
+
+test("an explicitly allowed filesystem root includes its descendants", async () => {
+  const { root, adapter } = await setup();
+  const service = new ProjectService({ roots: [path.parse(root).root], adapter });
+  const result = await service.createVideo({ projectPath: path.join(root, "drive-root.cineleaf"), media: [], dryRun: true });
+  assert.equal(result.summary.clipCount, 0);
+});
+
 test("retries with the same idempotency key do not render twice", async () => {
   const { root, adapter, service } = await setup();
   const request = {
@@ -153,6 +184,28 @@ test("batch preserves result order and enforces the maximum", async () => {
     service.createVideoBatch({ jobs: Array.from({ length: 33 }, () => jobs[0]) }),
     error => error instanceof AutomationError && error.code === "batch_too_large"
   );
+});
+
+test("batch stops scheduling new jobs after a failure and waits for in-flight work", async () => {
+  const { root, adapter } = await setup();
+  let validationCalls = 0;
+  let inFlightSettled = false;
+  adapter.validateProject = async () => {
+    const call = validationCalls++;
+    if (call === 0) throw new Error("invalid first job");
+    await new Promise(resolve => setTimeout(resolve, 30));
+    inFlightSettled = true;
+    return { valid: true };
+  };
+  const service = new ProjectService({ roots: [root], adapter });
+  const jobs = Array.from({ length: 4 }, (_, index) => ({
+    projectPath: path.join(root, `failure-${index}.cineleaf`), media: [], dryRun: true
+  }));
+
+  await assert.rejects(service.createVideoBatch({ jobs, concurrency: 2 }), /invalid first job/);
+
+  assert.equal(validationCalls, 2);
+  assert.equal(inFlightSettled, true);
 });
 
 test("inspects repeated media only once per video plan", async () => {

@@ -6,7 +6,7 @@ The native Windows editor and downloadable self-contained installer are prepared
 
 Verified locally on 27 July 2026:
 
-- 33 unit/localization/regression tests and 13 MCP contract/service tests pass.
+- 33 unit/localization/regression tests and 21 MCP contract/service tests pass.
 - 2 FFmpeg integration tests create, inspect, render, cancel, and re-inspect real synthetic media.
 - The MCP path has also created, natively validated, exported and re-inspected a real 720p project with video, audio and a text layer.
 - The application builds with 0 warnings and 0 errors.

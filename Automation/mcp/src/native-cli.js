@@ -42,6 +42,7 @@ export class NativeCliAdapter {
       });
       let stdout = "";
       let stderr = "";
+      let stderrLineBuffer = "";
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
       child.stdout.on("data", chunk => {
@@ -51,7 +52,9 @@ export class NativeCliAdapter {
       child.stderr.on("data", chunk => {
         stderr += chunk;
         if (stderr.length > 2_000_000) stderr = stderr.slice(-1_000_000);
-        for (const line of chunk.split(/\r?\n/)) {
+        const lines = (stderrLineBuffer + chunk).split(/\r?\n/);
+        stderrLineBuffer = lines.pop() ?? "";
+        for (const line of lines) {
           if (!line.trim()) continue;
           try { const event = JSON.parse(line); if (event.type === "progress") onProgress?.(event.progress); } catch { /* native diagnostics are data, never protocol */ }
         }

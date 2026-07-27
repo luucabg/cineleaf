@@ -30,7 +30,7 @@ These are in-memory engine microbenchmarks captured by `Windows/tools/Cineleaf.W
 
 | Repeatable case | Minimum | Median | Maximum |
 | --- | ---: | ---: | ---: |
-| MCP validation, exact planning and temporary package lifecycle | 78.388 ms | 86.391 ms | 104.964 ms |
+| MCP validation, canonical path checks, exact planning and temporary package lifecycle | 84.580 ms | 93.411 ms | 110.189 ms |
 
 The media adapter is deterministic in this benchmark and each video's repeated source is inspected once. It includes writing and deleting each temporary project JSON used by a dry run, but deliberately excludes native validation, real media probing, decode and export. It therefore measures automation and temporary-package overhead rather than encoding speed. Reproduce it with `npm run benchmark --prefix Automation/mcp`.
 

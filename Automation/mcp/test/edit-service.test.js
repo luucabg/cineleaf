@@ -117,3 +117,61 @@ test("adds subtitle clips and applies exact timeline and transform edits", async
   assert.equal(subtitle.textStyle.text, "Subtítulo automático revisado");
   assert.equal(subtitle.transform.positionY, 380);
 });
+
+test("serializes concurrent edits to the same project without losing either edit", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-concurrent-"));
+  const slowAdapter = { ...adapter, async validateProject(projectPath) {
+    if (projectPath.includes(".validation-")) await new Promise(resolve => setTimeout(resolve, 25));
+    return { valid: true };
+  } };
+  const service = new ProjectService({ roots: [root], adapter: slowAdapter });
+  const projectPath = path.join(root, "concurrent.cineleaf");
+  await service.createVideo({ projectPath, media: [], idempotencyKey: "create", confirmWrite: true });
+
+  await Promise.all(["One", "Two"].map((name, index) => service.editProject({
+    projectPath,
+    operations: [{ type: "add_marker", atSeconds: index + 1, name }],
+    dryRun: false,
+    confirmWrite: true,
+    idempotencyKey: `concurrent-${index}`
+  })));
+
+  const project = JSON.parse(await readFile(path.join(projectPath, "project.json"), "utf8"));
+  assert.deepEqual(project.timeline.markers.map(marker => marker.name).sort(), ["One", "Two"]);
+});
+
+test("splits reversed media with the same exact source ranges as the native edit engine", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-reversed-"));
+  const service = new ProjectService({ roots: [root], adapter });
+  const projectPath = path.join(root, "reversed.cineleaf");
+  await service.createVideo({
+    projectPath,
+    media: [{ path: path.join(root, "one.mp4"), durationSeconds: 10, speed: 2, reverse: true }],
+    idempotencyKey: "create",
+    confirmWrite: true
+  });
+  const clipId = (await service.inspectProject({ projectPath })).clips[0].id;
+  await service.editProject({
+    projectPath,
+    operations: [{ type: "split_clip", clipId, atSeconds: 4 }],
+    dryRun: false,
+    confirmWrite: true,
+    idempotencyKey: "split-reversed"
+  });
+
+  const project = JSON.parse(await readFile(path.join(projectPath, "project.json"), "utf8"));
+  const clips = project.timeline.tracks.flatMap(track => track.clips).filter(clip => clip.kind === "video");
+  assert.deepEqual(clips.map(clip => clip.sourceStart), [{ value: 12, timescale: 1 }, { value: 0, timescale: 1 }]);
+  assert.deepEqual(clips.map(clip => clip.duration), [{ value: 4, timescale: 1 }, { value: 6, timescale: 1 }]);
+});
+
+test("rejects delete operations that contain an unknown clip ID", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "cineleaf-edit-missing-"));
+  const service = new ProjectService({ roots: [root], adapter });
+  const projectPath = path.join(root, "missing.cineleaf");
+  await service.createVideo({ projectPath, media: [], idempotencyKey: "create", confirmWrite: true });
+  await assert.rejects(
+    service.editProject({ projectPath, operations: [{ type: "delete_clips", clipIds: [crypto.randomUUID()] }], dryRun: true }),
+    error => error.code === "clip_not_found"
+  );
+});
