@@ -22,7 +22,7 @@ public struct ClipPropertyBundle: Codable, Hashable, Sendable {
 
 public extension ProjectEditor {
     mutating func insertGap(at time: RationalTime, duration: RationalTime) throws {
-        guard time >= .zero, time < project.timeline.duration, duration > .zero else {
+        guard time >= .zero, project.timeline.duration > time, duration > .zero else {
             throw EditingError.invalidEdit
         }
         var draft = project
