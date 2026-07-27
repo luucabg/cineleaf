@@ -37,17 +37,37 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   build
 
+xcodebuild \
+  -project Cineleaf.xcodeproj \
+  -scheme CineleafCLI \
+  -configuration Release \
+  -destination 'generic/platform=macOS' \
+  -derivedDataPath "$DERIVED_DATA" \
+  ARCHS='arm64 x86_64' \
+  ONLY_ACTIVE_ARCH=NO \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+
 APP_SOURCE="$DERIVED_DATA/Build/Products/Release/Cineleaf.app"
 [[ -d "$APP_SOURCE" ]] || { echo "Cineleaf.app was not produced." >&2; exit 1; }
 ditto "$APP_SOURCE" "$DIST_DIR/Cineleaf.app"
+CLI_SOURCE="$DERIVED_DATA/Build/Products/Release/CineleafCLI"
+[[ -x "$CLI_SOURCE" ]] || { echo "CineleafCLI was not produced." >&2; exit 1; }
+ditto "$CLI_SOURCE" "$DIST_DIR/Cineleaf.app/Contents/MacOS/CineleafCLI"
+AUTOMATION_RESOURCES="$DIST_DIR/Cineleaf.app/Contents/Resources/Automation"
+mkdir -p "$AUTOMATION_RESOURCES/mcp/src"
+ditto "$REPOSITORY_ROOT/Automation/mcp/package.json" "$AUTOMATION_RESOURCES/mcp/package.json"
+ditto "$REPOSITORY_ROOT/Automation/mcp/package-lock.json" "$AUTOMATION_RESOURCES/mcp/package-lock.json"
+ditto "$REPOSITORY_ROOT/Automation/mcp/src" "$AUTOMATION_RESOURCES/mcp/src"
+ditto "$REPOSITORY_ROOT/scripts/setup_cineleaf_mcp.sh" "$AUTOMATION_RESOURCES/setup_cineleaf_mcp.sh"
 codesign --force --deep --sign - "$DIST_DIR/Cineleaf.app"
 codesign --verify --deep --strict "$DIST_DIR/Cineleaf.app"
-ditto -c -k --sequesterRsrc --keepParent "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.1.0-macOS.zip"
-"$REPOSITORY_ROOT/scripts/create_dmg.sh" "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.1.0-macOS.dmg"
+ditto -c -k --sequesterRsrc --keepParent "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.2.0-macOS.zip"
+"$REPOSITORY_ROOT/scripts/create_dmg.sh" "$DIST_DIR/Cineleaf.app" "$DIST_DIR/Cineleaf-0.2.0-macOS.dmg"
 
 (
   cd "$DIST_DIR"
-  shasum -a 256 Cineleaf-0.1.0-macOS.zip Cineleaf-0.1.0-macOS.dmg > SHA256SUMS.txt
+  shasum -a 256 Cineleaf-0.2.0-macOS.zip Cineleaf-0.2.0-macOS.dmg > SHA256SUMS.txt
 )
 
 echo "Created ad-hoc signed, non-notarized artifacts in $DIST_DIR"

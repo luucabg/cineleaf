@@ -15,6 +15,9 @@ Cineleaf links Apple system frameworks supplied with macOS: SwiftUI, AppKit, AVF
 
 ## Build and repository tooling
 
+- **Model Context Protocol TypeScript SDK** — MIT License — stable version 1.29.0 provides the optional local MCP server and is installed only when AI automation is enabled.
+- **Zod** — MIT License — version 4.4.3 validates the optional automation contract. Transitive npm packages retain the license files recorded in the locked dependency tree.
+
 - **XcodeGen** — MIT License — used to generate the Xcode project; not shipped in Cineleaf.
 - **Pillow** — HPND License — used by `scripts/generate_branding_assets.py`; not shipped in Cineleaf.
 - **DejaVu Sans** — Bitstream Vera and Arev-derived permissive licenses — used when available for repository artwork; no font file is redistributed.

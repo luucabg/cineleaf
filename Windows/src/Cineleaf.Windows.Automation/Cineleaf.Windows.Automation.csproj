@@ -1,11 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <UseWPF>true</UseWPF>
-    <AssemblyName>Cineleaf</AssemblyName>
-    <RootNamespace>Cineleaf.Windows</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.0-beta.1</Version>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Cineleaf.Automation</AssemblyName>
+    <RootNamespace>Cineleaf.Automation</RootNamespace>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -13,7 +10,6 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
     <DebugType>embedded</DebugType>
-    <ApplicationIcon>Assets\Cineleaf.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Cineleaf.Windows.Core\Cineleaf.Windows.Core.csproj" />

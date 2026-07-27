@@ -20,6 +20,20 @@ Performance is a release requirement for Cineleaf, not decorative polish. This d
 
 These are in-memory engine microbenchmarks captured by `Windows/tools/Cineleaf.Windows.Benchmarks`. They do not measure decode, screen refresh, storage, or final export speed. Reproduce them with `dotnet run --project Windows/tools/Cineleaf.Windows.Benchmarks -c Release`.
 
+## Recorded AI planning baseline
+
+- Date: 27 July 2026
+- Same Windows workstation as the engine baseline
+- Node.js 24.16.0
+- Workload: one dry-run batch of 32 videos, 100 repeated-source clips per video, concurrency 2
+- Samples: 3 warm-ups and 20 recorded iterations
+
+| Repeatable case | Minimum | Median | Maximum |
+| --- | ---: | ---: | ---: |
+| MCP validation, exact planning and temporary package lifecycle | 78.388 ms | 86.391 ms | 104.964 ms |
+
+The media adapter is deterministic in this benchmark and each video's repeated source is inspected once. It includes writing and deleting each temporary project JSON used by a dry run, but deliberately excludes native validation, real media probing, decode and export. It therefore measures automation and temporary-package overhead rather than encoding speed. Reproduce it with `npm run benchmark --prefix Automation/mcp`.
+
 ## Recorded automated baseline
 
 - Measurement revision: `6c4e455`
@@ -56,6 +70,8 @@ The table uses the unrounded samples printed in the XCTest log. Timing noise is 
 - Undo history is capped at 50 project snapshots.
 - Windows undo history is capped at 100 snapshots; preview work is debounced, cancellable, and stored in a bounded 2 GB disk cache.
 - Project validation fast-paths default transforms, fades, color, effects, and keyframes to avoid unnecessary temporary allocations.
+- AI requests deduplicate repeated media paths per plan; the native adapter also keeps a bounded 512-entry metadata cache invalidated by file size and modification time.
+- Batch output order is stable while work uses bounded concurrency. The default of two avoids starting enough simultaneous encoders to starve typical GPUs and storage.
 
 ## Engineering budgets
 

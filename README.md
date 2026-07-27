@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/luucabg/cineleaf/releases/tag/v0.1.0-beta.1"><img alt="Última versión" src="https://img.shields.io/github/v/release/luucabg/cineleaf?include_prereleases&color=327C60"></a>
+  <a href="https://github.com/luucabg/cineleaf/releases/tag/v0.2.0-beta.1"><img alt="Última versión" src="https://img.shields.io/github/v/release/luucabg/cineleaf?include_prereleases&color=327C60"></a>
   <a href="https://github.com/luucabg/cineleaf/actions/workflows/windows-ci.yml"><img alt="Pruebas de Windows" src="https://github.com/luucabg/cineleaf/actions/workflows/windows-ci.yml/badge.svg"></a>
   <a href="https://github.com/luucabg/cineleaf/actions/workflows/ci.yml"><img alt="Pruebas de Mac" src="https://github.com/luucabg/cineleaf/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/license-MIT-327C60.svg"></a>
@@ -16,13 +16,13 @@
 
 ## Descargar Cineleaf para Windows
 
-La forma más sencilla es descargar **[Cineleaf para Windows (instalador EXE)](https://github.com/luucabg/cineleaf/releases/download/v0.1.0-beta.1/Cineleaf-0.1.0-beta.1-Windows-x64-Setup.exe)**.
+La forma más sencilla es descargar **[Cineleaf para Windows (instalador EXE)](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-x64-Setup.exe)**.
 
 1. Descarga el archivo.
 2. Ábrelo y sigue el instalador. No necesita permisos de administrador.
 3. Abre Cineleaf desde el menú Inicio.
 
-También existe una **[versión portátil ZIP](https://github.com/luucabg/cineleaf/releases/download/v0.1.0-beta.1/Cineleaf-0.1.0-beta.1-Windows-x64-Portable.zip)** que no se instala. Los usuarios avanzados pueden comprobar la descarga con el archivo de **[sumas SHA-256](https://github.com/luucabg/cineleaf/releases/download/v0.1.0-beta.1/Cineleaf-0.1.0-beta.1-Windows-SHA256SUMS.txt)**.
+También existe una **[versión portátil ZIP](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-x64-Portable.zip)** que no se instala. Los usuarios avanzados pueden comprobar la descarga con el archivo de **[sumas SHA-256](https://github.com/luucabg/cineleaf/releases/download/v0.2.0-beta.1/Cineleaf-0.2.0-beta.1-Windows-SHA256SUMS.txt)**.
 
 > La versión de Windows es una beta para Windows 10/11 de 64 bits. El instalador no está firmado todavía, por lo que Windows puede mostrar una advertencia de SmartScreen. El código, las pruebas y el proceso de construcción son públicos.
 
@@ -49,6 +49,32 @@ Cineleaf está diseñado para responder al instante incluso en proyectos grandes
 - El instalador incluye todo lo necesario: no obliga a instalar .NET ni FFmpeg por separado.
 
 En un Ryzen 5 5600X, localizar lo visible dentro de 10.000 clips tuvo una mediana de **0,0079 ms**; validar un proyecto de una hora con 100 clips, **0,2289 ms**; y mover un clip con copia segura, historial y validación completa, **9,9172 ms**. Son medidas del motor, no una promesa de que toda exportación tarde lo mismo. Consulta [las medidas y sus límites](Documentation/PERFORMANCE.md).
+
+## Controlarlo con una IA
+
+Cineleaf incluye un servidor **MCP**, un puente estándar para que una IA compatible pueda trabajar con el editor sin tener que buscar botones en la pantalla. Puedes pedir, por ejemplo: “crea 12 vídeos verticales con estos clips, añade el título y expórtalos”. La IA puede:
+
+- Examinar un proyecto y recibir identificadores claros de clips, pistas y recursos.
+- Preparar uno o hasta 32 vídeos por lote, manteniendo el orden de los resultados.
+- Mover, recortar, dividir, transformar, silenciar o borrar clips con tiempos exactos.
+- Añadir textos, subtítulos y marcadores, y exportar en H.264 o HEVC de 720p a 4K.
+- Ver primero un plan sin tocar archivos y ejecutar después exactamente ese plan.
+
+Todo sigue ocurriendo en tu ordenador. El puente solo puede acceder a las carpetas que tú autorices, no usa una nube de Cineleaf y valida cada proyecto con el motor nativo de Windows o Mac antes de guardarlo. Los trabajos usan claves de reintento: si una exportación se interrumpe, se puede continuar sin crear el proyecto dos veces.
+
+La instalación para IA es opcional y requiere Node.js 20 o posterior. En Windows, después de instalar Cineleaf, abre PowerShell y ejecuta:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\Cineleaf\Automation\setup_cineleaf_mcp.ps1" -AllowedRoot "D:\Videos"
+```
+
+En Mac, después de copiar Cineleaf a Aplicaciones:
+
+```bash
+"/Applications/Cineleaf.app/Contents/Resources/Automation/setup_cineleaf_mcp.sh" "$HOME/Movies"
+```
+
+El instalador genera un pequeño bloque de configuración para pegar en cualquier cliente compatible con MCP. Consulta la [guía de automatización para IA](Documentation/AI_AUTOMATION.md), con ejemplos y límites explicados sin jerga.
 
 ## Funciones disponibles
 
@@ -97,7 +123,7 @@ En Windows, Cineleaf puede transcribir el audio usando el reconocimiento instala
 
 ## Estado de calidad
 
-Windows pasa 31 pruebas unitarias, 2 pruebas de integración con FFmpeg real y una exportación sintética que se vuelve a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. Mac mantiene 56 pruebas automatizadas y exportación sintética en GitHub Actions.
+Windows pasa 33 pruebas unitarias, 13 pruebas del contrato MCP, 2 pruebas de integración con FFmpeg real y una exportación sintética que se vuelve a inspeccionar. También se verifica cancelación, idiomas, construcción Release sin avisos, instalación silenciosa, arranque y desinstalación. Mac mantiene sus pruebas automatizadas, suma una prueba del puente nativo de IA y verifica una exportación sintética en GitHub Actions.
 
 No es honesto prometer que ningún programa tiene cero bugs. En esta beta no quedan fallos bloqueantes conocidos después de esas comprobaciones. La revisión visual por píxeles de Windows quedó pendiente porque la sesión de escritorio usada para construirlo estaba bloqueada; el proceso sí arrancó y permaneció estable. En Mac sigue pendiente una prueba manual completa en hardware físico. Consulta [STATUS.md](STATUS.md).
 

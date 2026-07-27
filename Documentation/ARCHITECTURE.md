@@ -2,6 +2,14 @@
 
 > Cineleaf now has two native front ends over compatible project concepts: Swift/AppKit/AVFoundation on Mac and C#/WPF/FFmpeg on Windows. The Windows solution lives in `Windows/` and is divided into `Cineleaf.Windows.Core` (models, editing, persistence), `Cineleaf.Windows.Media` (inspection, preview, captions and export), and `Cineleaf.Windows.App` (native UI). Neither version embeds a website.
 
+## AI automation boundary
+
+`Automation/mcp` is a small Node.js MCP server shared by Windows and Mac. It owns public request schemas, allowed-root checks, dry-run/confirmation rules, idempotency, exact project construction, bounded batches and compact project inspection. It does not decode or render media itself.
+
+The server starts a native process with an argument array and no shell. `Cineleaf.Windows.Automation` delegates inspection, validation and export to the same .NET/FFmpeg media services as the Windows app. `CineleafCLI` delegates those operations to `CineleafCore`, AVFoundation composition and export services on Mac. Both return a small JSON envelope on standard output, send progress separately on standard error and observe cancellation.
+
+The boundary is intentionally schema-first: seconds are convenient at MCP input, then converted to normalized rational time before persistence. Projects are validated by the native platform before an atomic write is committed. MCP batches are orchestration, not 32 unbounded encoders; concurrency is limited to four and defaults to two.
+
 ## Boundaries
 
 `CineleafCore` owns value models, exact timeline arithmetic, validation, interval indexing, editing commands, subtitle/automatic-caption rules, beat-marker selection, bounded history, project-format migration, and persistence primitives. It imports Foundation and CoreMedia where exact media interoperation is required, but never SwiftUI.

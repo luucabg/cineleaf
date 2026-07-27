@@ -25,6 +25,7 @@ Packages/*/.build/
 Package.resolved
 
 # Local tooling
+node_modules/
 .DS_Store
 .idea/
 .vscode/

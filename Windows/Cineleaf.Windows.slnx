@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Cineleaf.Windows.Automation/Cineleaf.Windows.Automation.csproj" />
     <Project Path="src/Cineleaf.Windows.App/Cineleaf.Windows.App.csproj" />
     <Project Path="src/Cineleaf.Windows.Core/Cineleaf.Windows.Core.csproj" />
     <Project Path="src/Cineleaf.Windows.Media/Cineleaf.Windows.Media.csproj" />

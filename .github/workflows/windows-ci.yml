@@ -25,6 +25,18 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Automation/mcp/package-lock.json
+      - name: Test MCP automation contract
+        shell: pwsh
+        run: |
+          npm ci --prefix Automation/mcp
+          npm audit --prefix Automation/mcp --audit-level=moderate
+          npm test --prefix Automation/mcp
       - name: Verify private brief is not tracked
         shell: pwsh
         run: |
@@ -37,12 +49,23 @@ jobs:
       - name: Build, test, and package Windows release
         shell: pwsh
         run: ./scripts/build_windows_release.ps1
+      - name: Smoke-test optional MCP setup
+        shell: pwsh
+        run: |
+          $allowedRoot = Join-Path $env:RUNNER_TEMP "cineleaf-ai-root"
+          $mcpRoot = Join-Path $env:RUNNER_TEMP "cineleaf-mcp"
+          New-Item -ItemType Directory -Path $allowedRoot | Out-Null
+          ./scripts/setup_cineleaf_mcp.ps1 -AllowedRoot $allowedRoot -McpInstallRoot $mcpRoot
+          $entry = (Get-Content -Raw (Join-Path $mcpRoot "cineleaf-mcp-config.json") | ConvertFrom-Json).mcpServers.cineleaf
+          if (-not (Test-Path -LiteralPath $entry.command) -or -not (Test-Path -LiteralPath $entry.args[0]) -or -not (Test-Path -LiteralPath $entry.args[4])) {
+            throw "Generated MCP configuration contains a missing executable or script."
+          }
       - name: Upload Windows release candidates
         uses: actions/upload-artifact@v7
         with:
           name: cineleaf-windows-x64
           path: |
-            dist/Cineleaf-0.1.0-beta.1-Windows-x64-Setup.exe
-            dist/Cineleaf-0.1.0-beta.1-Windows-x64-Portable.zip
-            dist/Cineleaf-0.1.0-beta.1-Windows-SHA256SUMS.txt
+            dist/Cineleaf-0.2.0-beta.1-Windows-x64-Setup.exe
+            dist/Cineleaf-0.2.0-beta.1-Windows-x64-Portable.zip
+            dist/Cineleaf-0.2.0-beta.1-Windows-SHA256SUMS.txt
           if-no-files-found: error

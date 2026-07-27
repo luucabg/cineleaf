@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $buildRoot = Join-Path $repositoryRoot "build\windows-release"
 $publishDirectory = Join-Path $buildRoot "app"
+$automationDirectory = Join-Path $publishDirectory "Automation"
 $distributionDirectory = Join-Path $repositoryRoot "dist"
 $toolsDirectory = Join-Path $buildRoot "ffmpeg"
 
@@ -25,7 +26,14 @@ if (-not $SkipTests) {
 
 dotnet publish (Join-Path $repositoryRoot "Windows\src\Cineleaf.Windows.App\Cineleaf.Windows.App.csproj") -c $Configuration -r win-x64 --self-contained true -o $publishDirectory --nologo
 if ($LASTEXITCODE -ne 0) { throw "Windows publish failed." }
-Get-ChildItem -LiteralPath $publishDirectory -Filter "*.pdb" -File | Remove-Item -Force
+dotnet publish (Join-Path $repositoryRoot "Windows\src\Cineleaf.Windows.Automation\Cineleaf.Windows.Automation.csproj") -c $Configuration -r win-x64 --self-contained true -o $automationDirectory --nologo
+if ($LASTEXITCODE -ne 0) { throw "Windows automation bridge publish failed." }
+Get-ChildItem -LiteralPath $publishDirectory -Filter "*.pdb" -File -Recurse | Remove-Item -Force
+[IO.Directory]::CreateDirectory((Join-Path $automationDirectory "mcp\src")) | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "Automation\mcp\package.json") -Destination (Join-Path $automationDirectory "mcp") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "Automation\mcp\package-lock.json") -Destination (Join-Path $automationDirectory "mcp") -Force
+Copy-Item -Path (Join-Path $repositoryRoot "Automation\mcp\src\*") -Destination (Join-Path $automationDirectory "mcp\src") -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "scripts\setup_cineleaf_mcp.ps1") -Destination $automationDirectory -Force
 [IO.Directory]::CreateDirectory((Join-Path $publishDirectory "Tools")) | Out-Null
 Copy-Item -LiteralPath (Join-Path $toolsDirectory "ffmpeg.exe") -Destination (Join-Path $publishDirectory "Tools") -Force
 Copy-Item -LiteralPath (Join-Path $toolsDirectory "ffprobe.exe") -Destination (Join-Path $publishDirectory "Tools") -Force
@@ -33,7 +41,7 @@ Copy-Item -LiteralPath (Join-Path $toolsDirectory "FFmpeg-LICENSE.txt") -Destina
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination (Join-Path $publishDirectory "LICENSE.txt") -Force
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "THIRD_PARTY_NOTICES.md") -Destination $publishDirectory -Force
 
-$portable = Join-Path $distributionDirectory "Cineleaf-0.1.0-beta.1-Windows-x64-Portable.zip"
+$portable = Join-Path $distributionDirectory "Cineleaf-0.2.0-beta.1-Windows-x64-Portable.zip"
 if (Test-Path -LiteralPath $portable) { Remove-Item -LiteralPath $portable -Force }
 Compress-Archive -Path (Join-Path $publishDirectory "*") -DestinationPath $portable -CompressionLevel Optimal
 
@@ -47,8 +55,8 @@ if ($null -eq $iscc) { throw "Inno Setup 6 is required to create the installer. 
 & $iscc "/DSourceDir=$publishDirectory" "/DOutputDir=$distributionDirectory" (Join-Path $repositoryRoot "Windows\installer\Cineleaf.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
 
-$artifacts = Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.1.0-beta.1-Windows-*" }
-$checksumPath = Join-Path $distributionDirectory "Cineleaf-0.1.0-beta.1-Windows-SHA256SUMS.txt"
+$artifacts = Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.2.0-beta.1-Windows-*" }
+$checksumPath = Join-Path $distributionDirectory "Cineleaf-0.2.0-beta.1-Windows-SHA256SUMS.txt"
 $lines = $artifacts | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
 [IO.File]::WriteAllLines($checksumPath, $lines, [Text.UTF8Encoding]::new($false))
-Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.1.0-beta.1-Windows-*" } | Select-Object FullName,Length
+Get-ChildItem -LiteralPath $distributionDirectory -File | Where-Object { $_.Name -like "Cineleaf-0.2.0-beta.1-Windows-*" } | Select-Object FullName,Length

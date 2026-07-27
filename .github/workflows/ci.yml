@@ -26,6 +26,23 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Automation/mcp/package-lock.json
+      - name: Test MCP automation contract
+        run: |
+          npm ci --prefix Automation/mcp
+          npm audit --prefix Automation/mcp --audit-level=moderate
+          npm test --prefix Automation/mcp
+      - name: Verify private brief is not tracked
+        run: |
+          if git ls-files | grep -Eiq '(^|/)instructions[.,]*\.md$'; then
+            echo 'A private instructions file is tracked.' >&2
+            exit 1
+          fi
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
@@ -46,9 +63,17 @@ jobs:
         run: |
           ./scripts/build_release.sh
           (cd dist && shasum -a 256 --check SHA256SUMS.txt)
-          hdiutil verify dist/Cineleaf-0.1.0-macOS.dmg
+          hdiutil verify dist/Cineleaf-0.2.0-macOS.dmg
           ARCHITECTURES="$(lipo -archs dist/Cineleaf.app/Contents/MacOS/Cineleaf)"
           [[ "$ARCHITECTURES" == *arm64* && "$ARCHITECTURES" == *x86_64* ]]
+      - name: Smoke-test optional MCP setup
+        run: |
+          mkdir -p "$RUNNER_TEMP/cineleaf-ai-root"
+          CINELEAF_MCP_INSTALL_ROOT="$RUNNER_TEMP/cineleaf-mcp" \
+          CINELEAF_AUTOMATION_CLI="$PWD/dist/Cineleaf.app/Contents/MacOS/CineleafCLI" \
+            ./scripts/setup_cineleaf_mcp.sh "$RUNNER_TEMP/cineleaf-ai-root"
+          test -f "$RUNNER_TEMP/cineleaf-mcp/src/index.js"
+          grep -q '"cineleaf"' "$RUNNER_TEMP/cineleaf-mcp/cineleaf-mcp-config.json"
       - name: Upload logs and generated project on failure
         if: failure()
         uses: actions/upload-artifact@v7

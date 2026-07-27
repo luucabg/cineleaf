@@ -17,6 +17,27 @@ settings:
     GCC_WARN_INHIBIT_ALL_WARNINGS: NO
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
 targets:
+  CineleafCLI:
+    type: tool
+    platform: macOS
+    sources:
+      - path: CineleafCLI
+      - path: Cineleaf/Services/BoundedCache.swift
+      - path: Cineleaf/Services/CineleafVideoCompositor.swift
+      - path: Cineleaf/Services/CompositionBuilder.swift
+      - path: Cineleaf/Services/ExportService.swift
+      - path: Cineleaf/Services/LocalDiagnostics.swift
+      - path: Cineleaf/Services/MediaAccessManager.swift
+      - path: Cineleaf/Services/MediaDerivativeStore.swift
+      - path: Cineleaf/Services/MediaInspector.swift
+      - path: Cineleaf/Services/ReverseMediaService.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.cineleaf.CineleafCLI
+        PRODUCT_NAME: CineleafCLI
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - package: CineleafCore
   Cineleaf:
     type: application
     platform: macOS
@@ -28,7 +49,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.cineleaf.Cineleaf
         PRODUCT_NAME: Cineleaf
-        MARKETING_VERSION: 0.1.0
+        MARKETING_VERSION: 0.2.0
         CURRENT_PROJECT_VERSION: 1
         INFOPLIST_FILE: Cineleaf/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -50,6 +71,7 @@ targets:
       - path: CineleafTests
     dependencies:
       - target: Cineleaf
+      - target: CineleafCLI
       - package: CineleafCore
     settings:
       base:
