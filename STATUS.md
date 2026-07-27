@@ -15,17 +15,19 @@ Verified locally on 27 July 2026:
 - Resolution/project settings, exact black pauses, range removal, safe duplicate, detached audio, original-audio extraction and frame capture are covered by regression tests.
 - Windows performance measurements and environment details are recorded in `Documentation/PERFORMANCE.md`.
 
+GitHub Actions run [30248743334](https://github.com/luucabg/cineleaf/actions/runs/30248743334) independently repeated the MCP tests/audit, private-brief guard, unit and real-media integration tests, Release publish, installer build, optional MCP setup smoke test and artifact upload on Windows Server 2025.
+
 The Windows workstation became locked during final visual inspection. Accessibility inspection confirmed the complete Spanish editor and a prior launch crash was diagnosed and fixed, but a final pixel-by-pixel screenshot review is still pending. The installer is unsigned, so SmartScreen can warn. No blocking defects are currently known after the automated and smoke checks.
 
 ## Mac — `0.3.0-beta.1` source candidate
 
-GitHub Actions run [30236063915](https://github.com/luucabg/cineleaf/actions/runs/30236063915) passed with Xcode 16.4 and Apple Swift 6.1.2:
+GitHub Actions run [30248743464](https://github.com/luucabg/cineleaf/actions/runs/30248743464) passed with Xcode 16.4 and Apple Swift 6.1.2:
 
-- 39 core tests, 15 application/localization tests and 2 critical UI flows passed.
-- Real synthetic media covered import, derivatives, analysis, effects, composition, cancellation and verified MP4 export.
+- 44 core tests, 17 application/localization/integration tests and 2 critical UI flows passed.
+- Real synthetic media covered import, derivatives, analysis, effects, composition, cancellation, verified M4A/PNG extraction and verified MP4 export.
 - Packaging produced a universal `arm64`/`x86_64` app, ZIP, DMG and checksums.
 
-The new utility pass adds the same project settings, black pauses, safe duplication, detached audio, verified M4A extraction and verified PNG frame capture. The source now contains 44 core tests, 17 application/localization/integration tests and 2 critical UI flows. This Windows workstation cannot compile AVFoundation code, so the updated Mac candidate must pass the macOS GitHub Actions gate before release.
+The utility pass includes project settings, black pauses, safe duplication, detached audio, verified M4A extraction and verified PNG frame capture. The updated AVFoundation source, CLI and universal packages all passed the macOS gate.
 
 Mac still needs a complete hands-on review on physical hardware before a signed public Mac download: playback feel, microphone permissions, Gatekeeper flow, long-session memory/energy profiling and final screenshots.
 
